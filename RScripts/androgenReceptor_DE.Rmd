@@ -1,0 +1,919 @@
+---
+title: "androgenReceptor_DE"
+author: "Melanie Smith"
+date: "17/8/2022"
+output: html_document
+---
+
+## Load R Packages
+
+```{r message=FALSE, warning=FALSE, error=FALSE}
+
+# Working with data:
+library(dplyr)
+library(magrittr)
+library(readr)
+library(tibble)
+library(reshape2)
+# Visualisation:
+library(kableExtra)
+library(ggplot2)
+library(ggbiplot)
+library(ggrepel)
+library(grid)
+library(RColorBrewer)
+# Set ggplot theme
+theme_set(theme_bw())
+# Other packages:
+library(here)
+# Bioconductor packages:
+library(AnnotationHub)
+library(edgeR)
+library(limma)
+library(Glimma)
+# Saving output
+library(xlsx)
+
+
+## save table function (individual files)
+# topTable : output table from DESeq
+# filname : path to output file
+saveTopTable <- function(topTable, filename) {
+  require(xlsx, quietly = TRUE)
+  stopifnot(!missing(topTable))
+  stopifnot(!missing(filename))
+  writexl::write_xlsx(data.frame(topTable) %>%
+  tibble::rownames_to_column("gene") %>%
+  arrange(., padj), 
+  filename)
+}
+
+## save table function (all tables in one file: multiple sheets)
+# file : the path to the output file
+# ... : a list of data to write to the workbook
+xlsx.writeMultipleData <- function (file, ...)
+  {
+    # require(xlsx, quietly = TRUE)
+  stopifnot(!missing(file))
+    objects <- list(...)
+    fargs <- as.list(match.call(expand.dots = TRUE))
+    objectNames <- as.character(fargs)[-c(1, 2)]
+    numberObjects <- length(objects)
+    for (i in 1:numberObjects) {
+        if (i == 1)
+            openxlsx::write.xlsx(objects[[i]], file, sheetName = objectNames[i])
+        else openxlsx::write.xlsx(objects[[i]], file, sheetName = objectNames[i],
+            append = TRUE)
+    }
+}
+
+
+```
+
+## Import Data
+- The first step is to import the gene counts and sample metadata data into R. 
+
+```{r importGeneCounts, message=FALSE, warning=FALSE}
+
+grch38_mRNA_placenta_counts <- readr::read_csv(here("rawData", 
+                               "new_counts_unchanged.csv"), 
+                          col_names = TRUE) %>%
+  as.data.frame %>%
+  tibble::column_to_rownames("...1")
+
+```
+
+## Gene Annotations
+### Import Gene Annotation Data
+- Gene annotations are useful for later interpreting the results of the differential gene expression analysis. They give information about genes, including genomic location (e.g. start and end coordinates), descriptions, type of gene (e.g. whether it's a non-coding or protein-coding gene) etc. 
+
+- Below, we retrieve gene annotation metadata from the Ensembl database using build GRCh38 (this step can take a while to run if running `AnnotationHub` for the first time, so I have saved out the `genes` object as an R object). 
+
+```{r eval=FALSE}
+
+# uncomment if running without a saved annotation file
+
+# # Load annotation hub
+# ah <- AnnotationHub()
+# 
+# # Search for the correct Ensembl gene annotation
+# ah %>%
+#   subset(grepl("sapiens", species)) %>%
+#   subset(rdataclass == "EnsDb")
+# 
+# ensDb <- ah[["AH78783"]]
+# 
+# # Get gene annotations
+# genes <- genes(ensDb) %>%
+#   as.data.frame
+# 
+# # save the annotation file
+# genes %>% saveRDS(here("cleanData/genes.rds"))
+
+```
+
+### Load Gene Annotation Data from file
+
+```{r load gene annotations}
+# if AnnotationHub objects are pre-downloaded. 
+genes <- readRDS(here("cleanData/genes.rds"))
+```
+
+- The `genes` data.frame is prepared so that the `row.names` (corresponding to Ensembl gene IDs) are in the same order as for the gene count matrix stored in `grch38_mRNA_placenta_counts`. 
+
+```{r message=FALSE, warning=FALSE}
+genes <- data.frame(gene = rownames(grch38_mRNA_placenta_counts)) %>%
+  left_join(genes %>% as.data.frame, 
+            by = c("gene"="gene_name")) %>%
+  dplyr::distinct(gene, .keep_all=TRUE) 
+
+rownames(genes) <- genes$gene
+```
+
+- The columns of information about the genes include:
+
+    - **seqnames**: Chromosome the gene is located on
+    - **start**: Start coordinate
+    - **end**: End coordinate
+    - **width**: Length of gene (bp)
+    - **strand** Strand the gene is located on
+    - **gene_id**: Ensembl gene identifier
+    - **gene_name**: Gene symbol
+    - **gene_biotype**: Type of gene
+    - **seq_coord_system**: Whether the gene is located on a chromosome or scaffold
+    - **description**: Short description of the gene / what it encodes
+    - **gene_id_version**: Version of the gene model in Ensembl
+    - **entrezid**: Entrez gene identifier
+
+- This information can help to put the differential gene expression analysis results in context later. For example, in some analyses, people may wish to focus on looking at particular `gene_biotype`s (e.g. protein-coding genes). 
+
+- Summarise the number of genes belonging to each `gene_biotype` in this particular dataset. 
+
+```{r}
+genes$gene_biotype %>%
+  table %>% 
+  data.frame() %>% 
+  set_colnames(c("gene_biotype", "frequency")) %>% 
+  dplyr::arrange(., desc(frequency)) %>% 
+  kableExtra::kable() %>%
+  kableExtra::kable_styling(full_width = F) %>%
+  kableExtra::scroll_box(height = "600px")
+
+# preview the genes information
+genes %>%
+  head(50) %>%
+  kable %>%
+  kable_styling %>%
+  scroll_box(height = "600px")
+
+```
+
+## Import metadata
+
+```{r import metadata}
+
+# Import metadata
+samples <- readr::read_csv(file = here(
+  "cleanData/originalDemographicsStillbirthCRE.csv"),
+  col_names = TRUE
+ )
+
+# Tidy up the hyphen in outcome
+samples$outcome <- gsub("-", "_", samples$outcome)
+
+# drop metadata for samples not in counts
+samples <- dplyr::filter(samples, 
+                         AGRF_ID %in% colnames(grch38_mRNA_placenta_counts))
+
+# add a sex_pathology column to the metadata
+samples <- mutate(samples, sex_pathology = paste(
+  infantSex, outcome, sep = "_")
+  )
+
+# set the new factor levels
+samples$sex_pathology <- factor(
+  samples$sex_pathology, c(
+    "Female_AGA",
+    "Male_AGA",
+    "Female_SGA",
+    "Male_SGA",
+    "Female_10_30th",
+    "Male_10_30th"
+    )
+  )
+
+
+samples$Study <- factor(
+  samples$Study, c(
+    "Martha",
+    "Sharon",
+    "Stacey",
+    "Olivia",
+    "Vicki"
+  )
+)
+
+```
+
+## Create DGEList object
+
+```{r createDGEList}
+
+# ensure counts are in the same order as the metadata samplenames
+grch38_mRNA_placenta_counts <- grch38_mRNA_placenta_counts[,samples$AGRF_ID]
+
+dge <- DGEList(counts = grch38_mRNA_placenta_counts, 
+               genes = genes,
+               samples = samples,
+               remove.zeros = TRUE) %>%  
+  calcNormFactors("TMM")
+
+# Preview the DGEList object
+dge
+
+```
+
+## Quality Checks
+
+### Library Sizes of samples
+
+```{r libSizes}
+
+dge$samples %>%
+  ggplot(aes(x = AGRF_ID, y = lib.size, fill = sex_pathology)) +
+  geom_bar(stat = "identity") +
+  labs(y = "Library size (total number of mapped and quantified reads)",
+       x = "Sample", fill = "Group") +
+  coord_flip() 
+
+```
+
+### Dimension Reduction
+#### Multi Dimensional Scaling (MDS)
+
+- Multi Dimensional Scaling (MDS) is a dimension reduction technique that summarises expression of the top 500 most variable genes expressed in each sample down to 2 dimensions, known as `Dimension 1` and `Dimension 2`. Dimension 1 represents the largest amount of variance that can be explained in the data. Plotting these principal components can help us visualise which samples show overall similar gene expression to each other -- similar samples will be situated closer to each other on the plot.
+
+- Because our information is stored in a `DGEList` type of object, we can make use of the `glMDSPlot` function from the *Glimma* package to make an interactive MDS plot. The MDS plot produced using the function below can be viewed by navigating to the `glimma-plots` directory and clicking on the MDS-Plot.html file, or by clicking [here](assets/glimma-plots/MDS-Plot.html). 
+
+```{r}
+
+glMDSPlot(dge, 
+          labels = dge$samples$samplename,
+          groups = dge$samples$infantSex)
+
+glMDSPlot(dge, 
+          labels = dge$samples$samplename,
+          groups = dge$samples$Study)
+
+```
+
+#### Principal Component Analysis (PCA)
+
+```{r pca}
+
+# Perform PCA analysis:
+pca_analysis <- prcomp(t(cpm(dge, log=TRUE)))
+summary(pca_analysis) 
+
+# Create the plot:
+pca_plot <- ggbiplot::ggbiplot(pca_analysis, 
+                   groups = dge$samples$sex_pathology, 
+                   ellipse = TRUE,
+                   var.axes = FALSE)
+
+pca_plot
+
+```
+
+```{r}
+
+ggbiplot::ggbiplot(pca_analysis, 
+                   groups = dge$samples$sex_pathology, 
+                   ellipse = FALSE,
+                   var.axes = FALSE)
+
+```
+
+```{r}
+
+ggbiplot::ggbiplot(pca_analysis, 
+                   groups = dge$samples$infantSex, 
+                   ellipse = FALSE,
+                   var.axes = FALSE)
+
+```
+
+### Drop low expressed genes
+
+```{r drop low expression genes}
+
+# drop genes that don't have an official gene symbol
+dge_dropped <- dge[!is.na(dge$genes$gene_id), ]
+
+# calculate the cpm value of a read count of 10 given the mean library size
+# (to be used in the keep.genes)
+cpm(10, mean(dge_dropped$samples$lib.size))
+
+# filter threshold (log2 CPM expression)
+filterCPM <- cpm(10, mean(dge_dropped$samples$lib.size))
+# filter threshold (smallest group)
+numSamples <- dim(dplyr::filter(
+  dge_dropped$samples,
+  outcome == "AGA" &
+    infantSex == "Male")
+  )[1]
+numSamples
+
+# new df of unfiltered cpm for the reduced DGEList
+rawCpm_mRNA <- cpm(dge_dropped)
+# new df of unfiltered log 2 cpm for the reduced DGEList
+rawlcpm_mRNA <- cpm(dge_dropped, log = TRUE, prior.count = 3)
+
+# remove low expressed genes (filterCPM in numSamples PE)
+keep.exprs <- rowSums(rawCpm_mRNA > filterCPM[[1]]) >= numSamples
+
+# Perform the filtering step and recalculate the TMM normalisation factors for each library.
+dge_dropped <- dge_dropped[keep.exprs,,keep.lib.sizes = FALSE]
+
+dim(dge_dropped)
+
+## The density of log-CPM values for pre-filtered data
+# (A) and post-filtered data
+# (B) are shown for each sample.
+## Dotted vertical lines mark the log-CPM of 1 threshold
+# (equivalent to a CPM value of 2) used in the filtering step.
+nsamples <- ncol(dge_dropped)
+col_mRNA <- colorRampPalette(RColorBrewer::brewer.pal(11,"Spectral"))(ncol(dge_dropped))
+par(mfrow=c(1,2))
+plot(
+  density(
+    rawlcpm_mRNA[,1]
+  ),
+  col = col_mRNA[1],
+  lwd = 2,
+  ylim = c(0, 0.20),
+  las = 2,
+  main = "",
+  xlab = "")
+title(main = "A. dge_dropped Unfiltered data", xlab = "Log-cpm")
+abline(v = 1, lty = 3)
+for (i in 1:nsamples){
+  den <- density(rawlcpm_mRNA[,i])
+  lines(den$x, den$y, col = col_mRNA[i], lwd = 2)
+}
+#legend("topright", legend = samples$samplename, text.col = col, bty = "n")
+#dev.off()
+lcpm <- cpm(dge_dropped, log=TRUE)
+plot(density(lcpm[,1]), col = col_mRNA[1], lwd = 2, ylim = c(0, 0.20), las = 2,
+     main = "", xlab = "")
+title(main = "B. dge_dropped Filtered data", xlab = "Log-cpm")
+abline(v = 1, lty = 3)
+for (i in 1:nsamples){
+  den <- density(lcpm[,i])
+  lines(den$x, den$y, col = col_mRNA[i], lwd = 2)
+}
+
+```
+
+### Drop Y chromosome genes
+
+```{r drop low expression genes}
+
+# drop genes that don't have an official gene symbol
+dge_noY <- dge_dropped[rownames(dplyr::filter(dge_dropped$genes, seqnames != "Y")), ]
+
+
+```
+
+### Save log2 counts for Ash
+
+```{r save counts}
+
+# lcpm <- edgeR::cpm(dge_dropped, log = TRUE) %>% 
+#   as.data.frame() %>% 
+#   tibble::rownames_to_column("gene")
+# 
+# require(openxlsx)
+# write.xlsx(lcpm,
+#            file = "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/log2CPM_counts.xlsx")
+
+
+```
+
+## Differential Expression {.tabset}
+### edgeR and Limma voom Sex specific differential expression
+
+- here I will use `edgeR` and `limma` for DE
+- Full regression model will be run followed by contrasts for sex specific DE
+
+```{r sex specific DE sex_pathology}
+
+# establish the design matrix
+design_mRNA_sex_SGA <- model.matrix(~0 + sex_pathology + maternalAge,
+                                    data = dge$samples)
+
+# make the column names a little nicer
+colnames(design_mRNA_sex_SGA) <- c("Female_AGA",
+                                   "Male_AGA",
+                                   "Female_SGA",
+                                   "Male_SGA",
+                                   "Female_10_30th",
+                                   "Male_10_30th",
+                                   "maternalAge")
+
+# perform the voom quality weights
+voom_mRNA_sex_SGA <- voom(dge, design_mRNA_sex_SGA, plot = TRUE)
+# fit the linear model
+fit_mRNA_sex_SGA <- lmFit(voom_mRNA_sex_SGA, design_mRNA_sex_SGA)
+
+# check the decide test
+summary(decideTests(fit_mRNA_sex_SGA)) # before FDR correction
+
+# set the contrasts - this makes it easier to "see" what we're testing
+contrast_mRNA_sex_SGA <- makeContrasts(female_SGA = Female_SGA-Female_AGA,
+                                       male_SGA = Male_SGA-Male_AGA,
+                                       levels = design_mRNA_sex_SGA)
+
+# fit a linear regression to the contrast questions
+fit_mRNA_sex_SGA <- contrasts.fit(fit_mRNA_sex_SGA, contrast_mRNA_sex_SGA)
+
+# perform bayesian adjustment
+fit_mRNA_sex_SGA <- eBayes(fit_mRNA_sex_SGA)
+
+# summary table of the sex SGA fit
+summary(decideTests(fit_mRNA_sex_SGA,
+                    adjust.method = "fdr",
+                    p.value = 0.05))
+
+# all DE results for the female_SGA comparison
+allTable_female_SGA <- topTable(fit_mRNA_sex_SGA,
+                             coef = 1,
+                             n = Inf,
+                             sort = "p")
+
+# saveRDS(allTable_female_SGA,
+#         file = "differentialExpressionFiles/allTable_female_SGA.Rds")
+# 
+# writexl::write_xlsx(as.data.frame(allTable_female_SGA),
+#                     "differentialExpressionFiles/allTable_female_SGA")
+
+# only significant (after fdr correction) DE results for the female_SGA comparison
+topTable_female_SGA <- topTable(fit_mRNA_sex_SGA,
+                             coef = 1,
+                             n = Inf,
+                             sort = "p",
+                             p = 0.05,
+                             adjust.method = "fdr") # requires eBayes.
+
+# all DE results for the female_SGA comparison
+allTable_male_SGA <- topTable(fit_mRNA_sex_SGA,
+                             coef = 2,
+                             n = Inf,
+                             sort = "p")
+
+# saveRDS(allTable_male_SGA,
+#         file = "differentialExpressionFiles/allTable_male_SGA.Rds")
+# 
+# writexl::write_xlsx(as.data.frame(allTable_male_SGA),
+#                     "differentialExpressionFiles/allTable_male_SGA")
+
+# only significant (after fdr correction) DE results for the female_SGA comparison
+topTable_male_SGA <- topTable(fit_mRNA_sex_SGA,
+                             coef = 2,
+                             n = Inf,
+                             sort = "p",
+                             p = 0.05,
+                             adjust.method = "fdr") # requires eBayes.
+
+```
+
+### edgeR and Limma voom Sex specific differential expression (dropped)
+`dge_dropped` refers to the DGEList object after we dropped genes that don't have an official gene symbol.
+
+```{r sex specific DE sex_pathology dropped}
+
+# establish the design matrix
+design_mRNA_sex_SGA_dropped <- model.matrix(~0 + sex_pathology,
+                                    data = dge_dropped$samples)
+
+# make the column names a little nicer
+colnames(design_mRNA_sex_SGA_dropped) <- c("Female_AGA",
+                                           "Male_AGA",
+                                           "Female_SGA",
+                                           "Male_SGA",
+                                           "Female_10_30th",
+                                           "Male_10_30th")
+
+# perform the voom quality weights
+voom_mRNA_sex_SGA_dropped <- voom(dge_dropped,
+                                  design_mRNA_sex_SGA_dropped,
+                                  plot = TRUE)
+# fit the linear model
+fit_mRNA_sex_SGA_dropped <- lmFit(
+  voom_mRNA_sex_SGA_dropped, design_mRNA_sex_SGA_dropped)
+
+# check the decide test
+summary(decideTests(fit_mRNA_sex_SGA_dropped)) # before FDR correction
+
+# set the contrasts - this makes it easier to "see" what we're testing
+contrast_mRNA_sex_SGA_dropped <- makeContrasts(
+  female_SGA = Female_SGA-Female_AGA,
+  male_SGA = Male_SGA-Male_AGA,
+  levels = design_mRNA_sex_SGA_dropped)
+
+# fit a linear regression to the contrast questions
+fit_mRNA_sex_SGA_dropped <- contrasts.fit(fit_mRNA_sex_SGA_dropped,
+                                          contrast_mRNA_sex_SGA_dropped)
+
+# perform bayesian adjustment
+fit_mRNA_sex_SGA_dropped <- eBayes(fit_mRNA_sex_SGA_dropped)
+
+# summary table of the sex SGA fit
+summary(decideTests(fit_mRNA_sex_SGA_dropped,
+                    adjust.method = "fdr",
+                    p.value = 0.05))
+
+# all DE results for the female_SGA comparison
+allTable_female_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
+                             coef = 1,
+                             n = Inf,
+                             sort = "p")
+
+# saveRDS(allTable_female_SGA,
+#         file = "differentialExpressionFiles/allTable_female_SGA_dropped.Rds")
+# 
+# writexl::write_xlsx(as.data.frame(allTable_female_SGA),
+#                     "differentialExpressionFiles/allTable_female_SGA_dropped")
+
+# only significant (after fdr correction) DE results for the female_SGA comparison
+topTable_female_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
+                             coef = 1,
+                             n = Inf,
+                             sort = "p",
+                             p = 0.05,
+                             adjust.method = "fdr") # requires eBayes.
+
+# all DE results for the female_SGA comparison
+allTable_male_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
+                             coef = 2,
+                             n = Inf,
+                             sort = "p")
+
+# saveRDS(allTable_male_SGA,
+#         file = "differentialExpressionFiles/allTable_male_SGA_dropped.Rds")
+# 
+# writexl::write_xlsx(as.data.frame(allTable_male_SGA),
+#                     "differentialExpressionFiles/allTable_male_SGA_dropped")
+
+# only significant (after fdr correction) DE results for the female_SGA comparison
+topTable_male_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
+                             coef = 2,
+                             n = Inf,
+                             sort = "p",
+                             p = 0.05,
+                             adjust.method = "fdr") # requires eBayes.
+
+```
+
+### edgeR and Limma voom Sex specific differential expression (noY)
+
+```{r sex specific DE sex_pathology noY}
+
+# establish the design matrix
+design_mRNA_sex_SGA_noY <- model.matrix(~0 + sex_pathology,
+                                    data = dge_noY$samples)
+
+# make the column names a little nicer
+colnames(design_mRNA_sex_SGA_noY) <- c("Female_AGA",
+                                       "Male_AGA",
+                                       "Female_SGA",
+                                       "Male_SGA",
+                                       "Female_10_30th",
+                                       "Male_10_30th")
+
+# perform the voom quality weights
+voom_mRNA_sex_SGA_noY <- voom(dge_noY,
+                                  design_mRNA_sex_SGA_noY,
+                                  plot = TRUE)
+# fit the linear model
+fit_mRNA_sex_SGA_noY <- lmFit(
+  voom_mRNA_sex_SGA_noY, design_mRNA_sex_SGA_noY)
+
+# check the decide test
+summary(decideTests(fit_mRNA_sex_SGA_noY)) # before FDR correction
+
+# set the contrasts - this makes it easier to "see" what we're testing
+contrast_mRNA_sex_SGA_noY <- makeContrasts(
+  female_SGA = Female_SGA-Female_AGA,
+  male_SGA = Male_SGA-Male_AGA,
+  levels = design_mRNA_sex_SGA_noY)
+
+# fit a linear regression to the contrast questions
+fit_mRNA_sex_SGA_noY <- contrasts.fit(fit_mRNA_sex_SGA_noY,
+                                          contrast_mRNA_sex_SGA_noY)
+
+# perform bayesian adjustment
+fit_mRNA_sex_SGA_noY <- eBayes(fit_mRNA_sex_SGA_noY)
+
+# summary table of the sex SGA fit
+summary(decideTests(fit_mRNA_sex_SGA_noY,
+                    adjust.method = "fdr",
+                    p.value = 0.05))
+
+# all DE results for the female_SGA comparison
+allTable_female_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
+                             coef = 1,
+                             n = Inf,
+                             sort = "p")
+
+# saveRDS(allTable_female_SGA,
+#         file = "differentialExpressionFiles/allTable_female_SGA_noY.Rds")
+# 
+# writexl::write_xlsx(as.data.frame(allTable_female_SGA),
+#                     "differentialExpressionFiles/allTable_female_SGA_noY")
+
+# only significant (after fdr correction) DE results for the female_SGA comparison
+topTable_female_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
+                             coef = 1,
+                             n = Inf,
+                             sort = "p",
+                             p = 0.05,
+                             adjust.method = "fdr") # requires eBayes.
+
+# all DE results for the female_SGA comparison
+allTable_male_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
+                             coef = 2,
+                             n = Inf,
+                             sort = "p")
+
+# saveRDS(allTable_male_SGA,
+#         file = "differentialExpressionFiles/allTable_male_SGA_noY.Rds")
+# 
+writexl::write_xlsx(as.data.frame(allTable_male_SGA),
+                    "cleanData/allTable_male_SGA_noY.xlsx")
+
+# only significant (after fdr correction) DE results for the female_SGA comparison
+topTable_male_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
+                             coef = 2,
+                             n = Inf,
+                             sort = "p",
+                             p = 0.05,
+                             adjust.method = "fdr") # requires eBayes.
+
+```
+
+### DESeq2 differential expression
+
+```{r DESeq2 differential expression}
+
+library(DESeq2)
+# establish DESeq2 object
+dds <- DESeqDataSetFromMatrix(countData = grch38_mRNA_placenta_counts,
+                              colData = samples,
+                              design= ~ sex_pathology)
+# filter for genes with low expression
+# 7 samples in smallest group (Female_10_30th)
+keep <- rowSums(counts(dds) >= 10) >= 7
+dds <- dds[keep,]
+
+# estimate size factors and dispersions
+# fit and model test
+dds <- DESeq(dds)
+
+# lists the coefficients
+resultsNames(dds)
+results <- results(dds)
+
+# result table for each comparison
+### Male AGA - Female AGA
+res_sex_pathology_Male_AGA_vs_Female_AGA <- results(dds,
+                                                    contrast = c("sex_pathology", "Male_AGA", "Female_AGA"),
+                                                    pAdjustMethod = "BH",
+                                                    alpha = 0.05)
+sum(res_sex_pathology_Male_AGA_vs_Female_AGA$padj < 0.05, na.rm=TRUE)
+
+resSig_res_sex_pathology_Male_AGA_vs_Female_AGA <- as.data.frame(res_sex_pathology_Male_AGA_vs_Female_AGA[ which(res_sex_pathology_Male_AGA_vs_Female_AGA$padj < 0.05 ), ])
+
+### Female AGA - Female SGA
+res_sex_pathology_Female_AGA_vs_Female_SGA <- results(dds,
+                                                      contrast = c("sex_pathology", "Female_AGA", "Female_SGA"),
+                                                      pAdjustMethod = "BH", alpha = 0.05)
+sum(res_sex_pathology_Female_AGA_vs_Female_SGA$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Female_AGA_vs_Female_SGA <- as.data.frame(res_sex_pathology_Female_AGA_vs_Female_SGA[ which(res_sex_pathology_Female_AGA_vs_Female_SGA$padj < 0.05 ), ])
+ 
+### Male SGA - Female AGA
+res_sex_pathology_Male_SGA_vs_Female_AGA <- results(dds, 
+                                                    contrast = c("sex_pathology", "Male_SGA", "Female_AGA"),
+                                                    pAdjustMethod = "BH", 
+                                                    alpha = 0.05)
+sum(res_sex_pathology_Male_SGA_vs_Female_AGA$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_SGA_vs_Female_AGA <- as.data.frame(res_sex_pathology_Male_SGA_vs_Female_AGA[ which(res_sex_pathology_Male_SGA_vs_Female_AGA$padj < 0.05 ), ])
+
+### Female_AGA - Female_10_30th
+res_sex_pathology_Female_AGA_vs_Female_10_30th <- results(dds, 
+                                                          contrast = c("sex_pathology", "Female_AGA", "Female_10_30th"), 
+                                                          pAdjustMethod = "BH", 
+                                                          alpha = 0.05)
+sum(res_sex_pathology_Female_AGA_vs_Female_10_30th$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Female_AGA_vs_Female_10_30th <- as.data.frame(res_sex_pathology_Female_AGA_vs_Female_10_30th[ which(res_sex_pathology_Female_AGA_vs_Female_10_30th$padj < 0.05 ), ])
+
+### Male_10_30th - Female_AGA
+res_sex_pathology_Male_10_30th_vs_Female_AGA <- results(dds, 
+                                                        contrast = c("sex_pathology", "Male_10_30th", "Female_AGA"),
+                                                        pAdjustMethod = "BH", 
+                                                        alpha = 0.05)
+sum(res_sex_pathology_Male_10_30th_vs_Female_AGA$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_10_30th_vs_Female_AGA <- as.data.frame(res_sex_pathology_Male_10_30th_vs_Female_AGA[ which(res_sex_pathology_Male_10_30th_vs_Female_AGA$padj < 0.05 ), ])
+
+### Male_AGA - Male_SGA
+res_sex_pathology_Male_AGA_vs_Male_SGA <- results(dds, 
+                                                  contrast = c("sex_pathology", "Male_AGA", "Male_SGA"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Male_AGA_vs_Male_SGA$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_AGA_vs_Male_SGA <- as.data.frame(res_sex_pathology_Male_AGA_vs_Male_SGA[ which(res_sex_pathology_Male_AGA_vs_Male_SGA$padj < 0.05 ), ])
+
+### Male_AGA - Female_SGA
+res_sex_pathology_Male_AGA_vs_Female_SGA <- results(dds, 
+                                                  contrast = c("sex_pathology", "Male_AGA", "Female_SGA"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Male_AGA_vs_Female_SGA$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_AGA_vs_Female_SGA <- as.data.frame(res_sex_pathology_Male_AGA_vs_Female_SGA[ which(res_sex_pathology_Male_AGA_vs_Female_SGA$padj < 0.05 ), ])
+
+### Male_AGA - Male_10_30
+res_sex_pathology_Male_AGA_vs_Male_10_30 <- results(dds, 
+                                                  contrast = c("sex_pathology", "Male_AGA", "Male_10_30th"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Male_AGA_vs_Male_10_30$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_AGA_vs_Male_10_30 <- as.data.frame(res_sex_pathology_Male_AGA_vs_Male_10_30[ which(res_sex_pathology_Male_AGA_vs_Male_10_30$padj < 0.05 ), ])
+
+### Male_AGA - Female_10_30
+res_sex_pathology_Male_AGA_vs_Female_10_30 <- results(dds, 
+                                                  contrast = c("sex_pathology", "Male_AGA", "Female_10_30th"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Male_AGA_vs_Female_10_30$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_AGA_vs_Female_10_30 <- as.data.frame(res_sex_pathology_Male_AGA_vs_Female_10_30[ which(res_sex_pathology_Male_AGA_vs_Female_10_30$padj < 0.05 ), ])
+
+### Male_SGA - Female_SGA
+res_sex_pathology_Male_SGA_vs_Female_SGA <- results(dds, 
+                                                  contrast = c("sex_pathology", "Male_SGA", "Female_SGA"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Male_SGA_vs_Female_SGA$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_SGA_vs_Female_SGA <- as.data.frame(res_sex_pathology_Male_SGA_vs_Female_SGA[ which(res_sex_pathology_Male_SGA_vs_Female_SGA$padj < 0.05 ), ])
+
+### Male_SGA - Male_10_30
+res_sex_pathology_Male_SGA_vs_Male_10_30 <- results(dds, 
+                                                  contrast = c("sex_pathology", "Male_SGA", "Male_10_30th"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Male_SGA_vs_Male_10_30$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_SGA_vs_Male_10_30 <- as.data.frame(res_sex_pathology_Male_SGA_vs_Male_10_30[ which(res_sex_pathology_Male_SGA_vs_Male_10_30$padj < 0.05 ), ])
+
+### Male_SGA - Female_10_30
+res_sex_pathology_Male_SGA_vs_Female_10_30 <- results(dds, 
+                                                  contrast = c("sex_pathology", "Male_SGA", "Female_10_30th"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Male_SGA_vs_Female_10_30$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_SGA_vs_Female_10_30 <- as.data.frame(res_sex_pathology_Male_SGA_vs_Female_10_30[ which(res_sex_pathology_Male_SGA_vs_Female_10_30$padj < 0.05 ), ])
+
+### Male_10_30 - Female_SGA
+res_sex_pathology_Male_10_30_vs_Female_SGA <- results(dds, 
+                                                  contrast = c("sex_pathology", "Male_10_30th", "Female_SGA"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Male_10_30_vs_Female_SGA$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_10_30_vs_Female_SGA <- as.data.frame(res_sex_pathology_Male_10_30_vs_Female_SGA[ which(res_sex_pathology_Male_10_30_vs_Female_SGA$padj < 0.05 ), ])
+
+### Male_10_30 - Female_AGA
+res_sex_pathology_Male_10_30_vs_Female_AGA <- results(dds, 
+                                                  contrast = c("sex_pathology", "Male_10_30th", "Female_AGA"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Male_10_30_vs_Female_AGA$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_10_30_vs_Female_AGA <- as.data.frame(res_sex_pathology_Male_10_30_vs_Female_AGA[ which(res_sex_pathology_Male_10_30_vs_Female_AGA$padj < 0.05 ), ])
+
+### Male_10_30 - Female_10_30
+res_sex_pathology_Male_10_30_vs_Female_10_30 <- results(dds, 
+                                                  contrast = c("sex_pathology", "Male_10_30th", "Female_10_30th"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Male_10_30_vs_Female_10_30$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Male_10_30_vs_Female_10_30 <- as.data.frame(res_sex_pathology_Male_10_30_vs_Female_10_30[ which(res_sex_pathology_Male_10_30_vs_Female_10_30$padj < 0.05 ), ])
+
+### Female_SGA - Female_10_30
+res_sex_pathology_Female_SGA_vs_Female_10_30 <- results(dds, 
+                                                  contrast = c("sex_pathology", "Female_SGA", "Female_10_30th"),
+                                                  pAdjustMethod = "BH", 
+                                                  alpha = 0.05)
+sum(res_sex_pathology_Female_SGA_vs_Female_10_30$padj < 0.05, na.rm=TRUE)
+
+resSig_sex_pathology_Female_SGA_vs_Female_10_30 <- as.data.frame(res_sex_pathology_Female_SGA_vs_Female_10_30[ which(res_sex_pathology_Female_SGA_vs_Female_10_30$padj < 0.05 ), ])
+
+```
+
+### convert results to data frames and save
+
+```{r convert and save}
+
+Male_AGA_vs_Female_AGA <- data.frame(res_sex_pathology_Male_AGA_vs_Female_AGA) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_AGA_vs_Male_SGA <- data.frame(res_sex_pathology_Male_AGA_vs_Male_SGA) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_AGA_vs_Female_SGA <- data.frame(res_sex_pathology_Male_AGA_vs_Female_SGA) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_AGA_vs_Male_10_30 <- data.frame(res_sex_pathology_Male_AGA_vs_Male_10_30) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_AGA_vs_Female_10_30 <- data.frame(res_sex_pathology_Male_AGA_vs_Female_10_30) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_SGA_vs_Female_AGA <- data.frame(res_sex_pathology_Male_SGA_vs_Female_AGA) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_SGA_vs_Female_SGA <- data.frame(res_sex_pathology_Male_SGA_vs_Female_SGA) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_SGA_vs_Male_10_30 <- data.frame(res_sex_pathology_Male_SGA_vs_Male_10_30) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_SGA_vs_Female_10_30 <- data.frame(res_sex_pathology_Male_SGA_vs_Female_10_30) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_10_30_vs_Female_AGA <- data.frame(res_sex_pathology_Male_10_30_vs_Female_AGA) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_10_30_vs_Female_SGA <- data.frame(res_sex_pathology_Male_10_30_vs_Female_SGA) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Male_10_30_vs_Female_10_30 <- data.frame(res_sex_pathology_Male_10_30_vs_Female_10_30) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Female_AGA_vs_Female_SGA <- data.frame(res_sex_pathology_Female_AGA_vs_Female_SGA) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Female_AGA_vs_Female_10_30 <- data.frame(res_sex_pathology_Female_AGA_vs_Female_10_30th) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+Female_SGA_vs_Female_10_30 <- data.frame(res_sex_pathology_Female_SGA_vs_Female_10_30) %>%
+                         tibble::rownames_to_column("gene") %>%
+                         arrange(., padj)
+
+
+require(openxlsx)
+list_of_datasets <- list("Male_AGA_vs_Female_AGA" = Male_AGA_vs_Female_AGA,
+                         "Male_AGA_vs_Male_SGA" = Male_AGA_vs_Male_SGA,
+                         "Male_AGA_vs_Female_SGA" = Male_AGA_vs_Female_SGA,
+                         "Male_AGA_vs_Male_10_30" = Male_AGA_vs_Male_10_30,
+                         "Male_AGA_vs_Female_10_30" = Male_AGA_vs_Female_10_30,
+                         "Male_SGA_vs_Female_AGA" = Male_SGA_vs_Female_AGA,
+                         "Male_SGA_vs_Female_SGA" = Male_SGA_vs_Female_SGA,
+                         "Male_SGA_vs_Male_10_30" = Male_SGA_vs_Male_10_30,
+                         "Male_SGA_vs_Female_10_30" = Male_SGA_vs_Female_10_30,
+                         "Male_10_30_vs_Female_AGA" = Male_10_30_vs_Female_AGA,
+                         "Male_10_30_vs_Female_SGA" = Male_10_30_vs_Female_SGA,
+                         "Male_10_30_vs_Female_10_30" = Male_10_30_vs_Female_10_30,
+                         "Female_AGA_vs_Female_SGA" = Female_AGA_vs_Female_SGA,
+                         "Female_AGA_vs_Female_10_30" = Female_AGA_vs_Female_10_30,
+                         "Female_SGA_vs_Female_10_30" = Female_SGA_vs_Female_10_30
+                         )
+write.xlsx(list_of_datasets, file = "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/ARE_DE.xlsx")
+
+
+
+```

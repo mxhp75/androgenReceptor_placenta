@@ -1,0 +1,207 @@
+wd <- setwd("E:/RNAseq_project_AR")
+View(wd)
+
+View(bam.files)
+
+wd <- setwd("E:/RNAseq_project_AR")
+list.files("E:/RNAseq_project_AR", pattern = "BAM$")
+
+bam.files <- list.files("E:/RNAseq_project_AR", pattern = "L002_R1.fastq.gz.subread.BAM$")
+bam.files
+
+write.csv(bam.files2, "bam.files2.csv")
+
+library(Rsubread)
+library(edgeR)
+
+fc_22 <- featureCounts(bam.files, annot.ext = "E:/RNAseq_project_AR/GR38.gtf", isGTFAnnotationFile = T, GTF.attrType = "gene")
+
+write.csv(fc_22[["targets"]], "fc_working_samples.csv")
+
+View(fc_22[["annotation"]])
+
+genes <- fc_22[["annotation"]][c(1,6)]
+View(genes)
+
+group <- factor(c("E","E","E","E","B","F","E","E","B","B","D","D","D","D","B","A","E","D","C","E","A","F","F","F","F","F","A","A","A","A","A","C","D","D","D","C","A","D","F","D","C","D","C","C","C","F","C","C","C","C","D","A","C","D","D","A","A","D","A","A","A","D","D","C","A","A","A","A","B","E","E","B","E","E","B","B"))
+  
+site <- factor(c("1","1","1","4","4","1","4","4","4","4","5","5","5","5","5","5","5","5","5","5","5","1","1","3","1","1","1","3","3","3","1","1","3","3","3","1","2","4","3","4","3","3","1","3","1","1","1","1","4","4","2","2","3","2","3","3","1","1","1","1","1","1","1","4","4","4","4","4","2","1","1","1","1","1","1","1"))
+
+fc_3 <- fc_22[["counts"]]
+
+dge <- DGEList(counts=fc_3,genes=genes, group=group)
+View(dge)
+
+memory.limit(size=56000)
+
+keep <- filterByExpr(dge)
+dge.2 <- dge[keep, , keep.lib.sizes=FALSE]
+
+dge.2 <- cpm(dge.2, log=TRUE, prior.count=2)
+?cpm
+View(dge.2)
+
+colnames(dge.2) <- c("100","103","105","107","108","11","110","111","112","113","114","115","116","117","118","119","120","121","122","123","124","13","14","15","18","19","23","25","26","27","28","3","34","35","36","37","38","39","4","40","41","44","48","5","52","54","55","56","62","63","64","68","7","70","71","72","73","74","75","76","77","78","79","8","80","81","82","83","89","92","94","95","96","97","98","99")
+View(dge.2)
+
+dge.3 <- calcNormFactors(dge.2, method = "TMM")
+dge.3 <- estimateCommonDisp(dge.3)
+
+
+dge_males_2022_D_vs_E <- exactTest(dge.3, pair=4:5)
+dge_males_2022_D_vs_F <- exactTest(dge.3, pair=c(4,6))
+dge_males_2022_E_vs_F <- exactTest(dge.3, pair=c(5,6))
+
+qv_males_2022_E_vs_F <- p.adjust(dge_males_2022_E_vs_F[["table"]][["PValue"]], method="BH")
+qv_males_2022_D_vs_E <- p.adjust(dge_males_2022_D_vs_E[["table"]][["PValue"]], method="BH")
+qv_males_2022_D_vs_F <- p.adjust(dge_males_2022_D_vs_F[["table"]][["PValue"]], method="BH")
+
+write.csv(dge_males_2022_D_vs_E[["table"]], "dge_males_2022_D_v_E.csv")
+write.csv(qv_males_2022_D_vs_E, "qv_males_2022_D_vs_E.csv")
+write.csv(dge_males_2022_E_vs_F[["table"]], "dge_males_2022_E_v_F.csv")
+write.csv(qv_males_2022_E_vs_F, "qv_males_2022_E_v_F.csv")
+
+write.csv(dge_males_2022_D_vs_F[["table"]], "dge_males_2022_D_v_F.csv")
+write.csv(qv_males_2022_D_vs_F, "qv_males_2022_D_vs_F.csv")
+
+dge_females_2022_A_vs_B <- exactTest(dge.3, pair=1:2)
+dge_females_2022_A_vs_C <- exactTest(dge.3, pair=c(1,3))
+
+qv_females_2022_A_vs_B <- p.adjust(dge_females_2022_A_vs_B[["table"]][["PValue"]], method="BH")
+qv_females_2022_A_vs_C <- p.adjust(dge_females_2022_A_vs_C[["table"]][["PValue"]], method="BH")
+
+write.csv(dge_females_2022_A_vs_B[["table"]], "dge_females_2022_A_v_B.csv")
+write.csv(qv_females_2022_A_vs_B, "qv_females_2022_A_vs_B.csv")
+
+write.csv(dge_females_2022_A_vs_C[["table"]], "dge_females_2022_A_v_C.csv")
+write.csv(qv_females_2022_A_vs_C, "qv_females_2022_A_vs_C.csv")
+
+#########
+
+library("biomaRt")
+
+mart <- useMart("ENSEMBL_MART_ENSEMBL")
+mart <- useDataset('hsapiens_gene_ensembl', mart)
+annotLookup <- getBM(mart = mart,  attributes = c('hgnc_symbol', 'ensembl_gene_id', 'gene_biotype'), uniqueRows = TRUE)
+
+###analysis 1 - m.r.1 = males <10th vs 10th-30th (D vs E)
+
+m.r.1 <- read.csv("dge_males_2022_D_v_E.csv")
+names(m.r.1)[names(m.r.1) == "gene"] <- "hgnc_symbol"
+View(m.r.1)
+library(dplyr)
+library(readr)
+m.r.1 <- left_join(m.r.1, annotLookup, c("hgnc_symbol"))
+View(m.r.1)
+
+write.csv(m.r.1, "male_results_2022_D_v_E.csv")
+
+###analysis 2 - m.r.2 = males <10th vs >30th (D vs F)
+
+m.r.2 <- read.csv("dge_males_2022_D_v_F.csv")
+names(m.r.2)[names(m.r.2) == "gene"] <- "hgnc_symbol"
+View(m.r.2)
+m.r.2 <- left_join(m.r.2, annotLookup, c("hgnc_symbol"))
+View(m.r.2)
+
+write.csv(m.r.2, "male_results_2022_D_v_F.csv")
+
+###analysis 2,2 - m.r.3 = males 10th-30th vs >30th (E vs F)
+
+m.r.3 <- read.csv("dge_males_2022_E_v_F.csv")
+names(m.r.3)[names(m.r.3) == "gene"] <- "hgnc_symbol"
+View(m.r.3)
+m.r.3 <- left_join(m.r.3, annotLookup, c("hgnc_symbol"))
+View(m.r.3)
+
+write.csv(m.r.3, "male_results_2022_E_v_F.csv")
+
+
+
+####analysis 3- f.r.1 = females <10th vs 10th-30th (A vs B)
+
+f.r.1 <- read.csv("dge_females_2022_A_v_B.csv")
+names(f.r.1)[names(f.r.1) == "gene"] <- "hgnc_symbol"
+f.r.1 <- left_join(f.r.1, annotLookup, c("hgnc_symbol"))
+write.csv(f.r.1, "female_results_2022_A_v_B.csv")
+
+####analysis 4 - f.r.2 = females <10th vs 10th-30th (A vs C)
+
+f.r.2 <- read.csv("dge_females_2022_A_v_C.csv")
+names(f.r.2)[names(f.r.2) == "gene"] <- "hgnc_symbol"
+f.r.2 <- left_join(f.r.2, annotLookup, c("hgnc_symbol"))
+write.csv(f.r.2, "female_results_2022_A_v_C.csv")
+
+write.csv(fc_22[["counts"]], "feature_counts_check.csv")
+
+save.image("22Feb10.RData")
+
+load("22Feb10.RData")
+
+library("edgeR")
+
+###RPKMs
+
+View(genes)
+
+dge <- DGEList(counts=fc_3,genes=genes, group=group)
+View(dge)
+
+memory.limit(size=56000)
+
+keep <- filterByExpr(dge)
+dge.2 <- dge[keep, , keep.lib.sizes=FALSE]
+
+RPKM <- rpkm(dge.2)
+
+View(RPKM)
+
+write.csv(RPKM, "rpkm.csv")
+
+save.image("22Feb14.Rdata")
+
+load("22Feb14.Rdata")
+
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("gplots")
+
+
+###ADD SIGNIFICANCE CATEGORY TO RESULTS DATA FRAME
+m.r.DvsE <- read.csv("male_results_2022_D_v_E_protein_coding.csv")
+
+m.r.DvsE$sig <- ifelse(m.r.DvsE$logFC<0 & m.r.DvsE$qval<0.05, "Sig Down", ifelse(m.r.DvsE$logFC>0 & m.r.DvsE$qval<0.05, "Sig Up", "Not sig"))
+View(m.r.DvsE)                       
+
+###VOLC PLOT 
+
+library(ggrepel)
+library(tibble)
+library(viridis)
+library(tidyverse)
+library(RColorBrewer)
+library(pheatmap)
+
+m.p.DvsE = ggplot(m.r.DvsE, aes(logFC, -log10(qval))) +
+  geom_point(aes(col=sig)) + xlim(-4, 4) +
+  scale_color_manual(values=c("grey 30","dodgerblue 3","red 1"))
+m.p.DvsE+geom_text_repel(data=filter(m.r.DvsE, qval<0.0000000066, gene_biotype == 'protein_coding' & hgnc_symbol !='-'), aes(label=hgnc_symbol), max.overlaps = Inf)+ggtitle("Male <10th vs 10th-30th")
+
+m.r.DvsF <- read.csv("male_results_2022_D_v_F_protein_coding.csv")
+
+m.r.DvsF$sig <- ifelse(m.r.DvsF$logFC<0 & m.r.DvsF$qval<0.05, "Sig Down", ifelse(m.r.DvsF$logFC>0 & m.r.DvsF$qval<0.05, "Sig Up", "Not sig"))
+m.p.DvsF = ggplot(m.r.DvsF, aes(logFC, -log10(qval))) +
+  geom_point(aes(col=sig)) +  xlim(-5, 5) +
+  scale_color_manual(values=c("grey 30","dodgerblue 3","red 1"))
+m.p.DvsF+geom_text_repel(data=filter(m.r.DvsF, qval<0.000000000536, gene_biotype == 'protein_coding' & hgnc_symbol !='-'), aes(label=hgnc_symbol), max.overlaps = Inf)+ggtitle("Male <10th vs >30th")
+
+
+m.r.EvsF <- read.csv("male_results_2022_E_v_F_protein_coding.csv")
+
+m.r.EvsF$sig <- ifelse(m.r.EvsF$logFC<0 & m.r.EvsF$qval<0.05, "Sig Down", ifelse(m.r.EvsF$logFC>0 & m.r.EvsF$qval<0.05, "Sig Up", "Not sig"))
+m.p.EvsF = ggplot(m.r.EvsF, aes(logFC, -log10(qval))) +
+  geom_point(aes(col=sig)) + xlim(-4, 4) +
+  scale_color_manual(values=c("grey 30","dodgerblue 3","red 1"))
+m.p.EvsF+geom_text_repel(data=filter(m.r.EvsF, qval<0.00000146, gene_biotype == 'protein_coding' & hgnc_symbol !='-'), aes(label=hgnc_symbol), max.overlaps = Inf)+ggtitle("Male 10th-30th vs >30th")
+

@@ -1,0 +1,94 @@
+﻿AGRF_ID,number,Id,outcome,Study,placentaWeight,gestation,maternalAge,ethnicity,BMI,parity ,BWC_Centile,infantSex,birthweight,delivery,deliverCode
+VC01_3,3,M3790,AGA,Martha,780,266,31,Australia (Greek),36.8,4,,Female,3560,Caesarean Section not in labour,CS
+VC01_4,4,12,AGA,Sharon,,278,33,Chinese,18.7,1,,Male,4196,Caesarean Section,CS
+VC01_5,5,33A,AGA,Sharon,,273,35,German,32,1,,Female,3650,Caesarean Section,CS
+VC01_7,7,53A,AGA,Sharon,,277,34,Chinese,21.9,1,,Female,3560,Caesarean Section,CS
+VC01_8,8,V1_231,AGA,Stacey,,269,26,Australia,26.7,2,98.2,Female,4130,Elective Caesarean Section,CS
+VC01_11,11,M2288,AGA,Martha,890,267,32,Australia,,3,10-90th,Male,3760,Caesarean Section not in labour,CS
+VC01_13,13,M3242,AGA,Martha,600,272,33,Australia,41.8,2,,Male,3560,Caesarean Section not in labour,CS
+VC01_14,14,M3617,AGA,Martha,1030,266,29,Australia (European),35,2,,Male,4570,Caesarean Section not in labour,CS
+VC01_15,15,4,AGA,Sharon,,282,33,Japanese,20.9,1,,Male,4260,Caesarean Section,CS
+VC01_18,18,M1721,AGA,Martha,709,274,23,Australia,21.4,1,10-90th,Male,3770,Normal vaginal delivery,VD
+VC01_19,19,M2072,AGA,Martha,460,266,37,Australia,21.3,1,>90th,Male,3945,Normal vaginal delivery,VD
+VC01_23,23,M4053,SGA,Martha,424,259,31,Bulgaria (European),22.3,1,,Female,2440,Caesarean Section not in labour,CS
+VC01_25,25,146A,SGA,Sharon,,261,30,Indian,31.5,1,<5,Female,2125,Caesarean Section,CS
+VC01_26,26,64A,SGA,Sharon,,262,33,Korean,26.6,1,<3,Female,2040,CS for prev & IUGR,CS
+VC01_27,27,79A,SGA,Sharon,,260,28,Nepalease,18.2,0,<3,Female,1796,Caesarean Section,CS
+VC01_28,28,M1749,SGA,Martha,520,265,30,Korea,19.3,1,<10th,Female,2246,Normal vaginal delivery,VD
+VC01_34,34,138A,SGA,Sharon,,259,34,Asian,19.1,0,<10,Male,2500,Caesarean Section,CS
+VC01_35,35,142A,SGA,Sharon,,260,34,Asian,21.3,0,<3,Male,2240,Caesarean Section,CS
+VC01_36,36,60A,SGA,Sharon,,259,35,Australia,20.7,0,<3,Male,2263,CS for PET IUGR,CS
+VC01_37,37,M1811,AGA,Martha,,269,25,Australia - European (AUE),28.7,1,86.6,Female,3800,Normal vaginal delivery,VD
+VC01_39,39,V1_202,SGA,Stacey,,271,31,India,19.5,1,4.7,Male,2530,Vaginal birth-cephalic-non instrumental,VD
+VC01_40,40,V1_206,SGA,Stacey,,280,28,Thailand,19.8,2,1,Male,2740,Vaginal birth-cephalic-non instrumental,VD
+VC01_41,41,3,AGA,Sharon,,278,36,Phillipineo,36,1,,Female,4200,Caesarean Section,CS
+VC01_44,44,42A,AGA,Sharon,,278,30,Nepalese,21.7,0,,Male,3900,Caesarean Section,CS
+VC01_48,48,M1481,AGA,Martha,,269,30,Australia,20,2,>90th,Female,4090,Caesarean Section not in labour,CS
+VC01_52,52,M2160,AGA,Martha,1000,275,33,Australia,33.3,3,>90th,Female,4040,Caesarean Section not in labour,CS
+VC01_54,54,M2656,AGA,Martha,750,278,29,England,27.9,1,10-90th,Male,3640,Normal vaginal delivery,VD
+VC01_56,56,M4353,AGA,Martha,1109,266,36,Australia,38.9,2,,Female,5060,Caesarean Section not in labour,CS
+VC01_62,62,V1_097,AGA,Stacey,,286,33,Australia,26.6,3,87.4,Female,4270,Vaginal birth-cephalic-non instrumental,VD
+VC01_63,63,V1_182,AGA,Stacey,,287,28,India,22,2,60.6,Female,3655,Caesarean Section,CS
+VC01_64,64,62,SGA,Olivia,0.3695,261,29,,21,,25th,Male,2460,Caesarean Section,CS
+VC01_38,38,277,SGA,Olivia,0.342,269,28,,22.45,,10th,Female,2215,Vaginal,VD
+VC01_68,68,364,SGA,Olivia,0.3308,261,31,,20,,25th,Female,2430,CS2,CS
+VC01_70,70,409,SGA,Olivia,Not recorded ,263,16,,18,,10th,Male,2019,Vaginal,VD
+VC01_71,71,128A,SGA,Sharon,,262,37,Sri Lankan,21,1,<3,Male,2180,Caesarean Section,CS
+VC01_72,72,80A,SGA,Sharon,,268,37,Australia,22,1,<1,Female,1153,Caesarean Section,CS
+VC01_73,73,M1793,SGA,Martha,,260,33,India,35.7,2,<10th,Female,2130,Caesarean Section not in labour,CS
+VC01_74,74,M2118,SGA,Martha,380,267,30,Australia,20,2,<10th,Male,2225,Caesarean Section not in labour,CS
+VC01_75,75,M2301,SGA,Martha,455,264,46,Australia (Greek),28.4,1,<10th,Female,2370,Caesarean Section not in labour,CS
+VC01_76,76,M2802,SGA,Martha,590,270,27,Saudi Arabia (Arabic),21.2,1,<10th,Female,2460,Caesarean Section not in labour,CS
+VC01_77,77,M2881,SGA,Martha,380,265,31,Australia (Asian),22.3,1,3,Female,2320,Caesarean Section not in labour,CS
+VC01_78,78,M2920,SGA,Martha,370,261,36,Australia (Caucasian),24.4,1,2.6,Male,2200,Caesarean Section not in labour,CS
+VC01_79,79,M4141,SGA,Martha,520,262,32,Phillipines (Asian),21.9,1,,Male,2270,Caesarean Section not in labour,CS
+VC01_80,80,V1_039,SGA,Stacey,,273,26,Australia,22.7,1,1,Female,2400,Vaginal birth-cephalic-non instrumental,VD
+VC01_81,81,V1_124,SGA,Stacey,,272,34,India,22.2,1,1.7,Female,2345,Elective Caesarean Section,CS
+VC01_82,82,V1_238,SGA,Stacey,,269,32,India,19.78,2,3.8,Female,2330,Elective Caesarean Section,CS
+VC01_83,83,V1_251,SGA,Stacey,,269,27,Australia,29,1,0.4,Female,2265,Elective Caesarean Section,CS
+VC01_89,89,334,10-30th,Olivia,499,273,31,,23.14,,25th,Female,2998,Vaginal,VD
+VC01_92,92,M1365,10-30th,Martha,,266,40,,,2,11,Male,3020,Caesarean Section not in labour,CS
+VC01_94,94,M1425,10-30th,Martha,,279,34,Australia,,2,23.6,Male,3360,Caesarean Section not in labour,CS
+VC01_95,95,M1946,10-30th,Martha,417,277,29,Australia,,1,17.3,Female,2850,Normal vaginal delivery,VD
+VC01_96,96,M1990,10-30th,Martha,510,282,35,Australia,,1,20.4,Male,3230,Caesarean Section in labour,CS
+VC01_97,97,M2037,10-30th,Martha,592,285,28,China,,1,19.8,Male,3320,Normal vaginal delivery,VD
+VC01_98,98,M2223,10-30th,Martha,460,260,33,Switzerland,,2,15.4,Female,2710,Caesarean Section not in labour,CS
+VC01_99,99,M2649,10-30th,Martha,740,281,29,Iraq (Arabic),,1,19.4,Female,3150,Normal vaginal delivery,VD
+VC01_100,100,M2882,10-30th,Martha,440,264,30,Australia,,2,18.6,Male,2922,Caesarean Section in labour,CS
+VC01_101,101,M3146,10-30th,Martha,470,283,30,Australia,,2,16.4,Male,3120,Caesarean Section not in labour,CS
+VC01_103,103,M3965,10-30th,Martha,585,270,33,South Africa,,2,30.9,Male,3420,Caesarean Section not in labour,CS
+VC01_105,105,M4306,10-30th,Martha,550,276,31,Vietnam,,2,25,Male,3220,Normal vaginal delivery,VD
+VC01_107,107,V1_031,10-30th,Stacey,,273,30,China,19.1,1,20,Male,3050,Vaginal birth-cephalic-assisted instrumental,VD
+VC01_108,108,V1_047,10-30th,Stacey,,273,26,Australia,21.9,1,18.5,Female,2870,Vaginal birth-cephalic-non instrumental,VD
+VC01_110,110,V1_067,10-30th,Stacey,,280,34,Ireland,26.5,2,17.7,Male,3390,Vaginal birth-cephalic-non instrumental,VD
+VC01_111,111,V1_142,10-30th,Stacey,,286,35,Australia,35.3,3,21,Male,3500,Vaginal birth-cephalic-non instrumental,VD
+VC01_112,112,V1_186,10-30th,Stacey,,273,33,Australia,22,2,11.1,Female,2740,Vaginal birth-cephalic-non instrumental,VD
+VC01_113,113,V1_201,10-30th,Stacey,,273,30,Australia,23.4,2,28.8,Female,3030,Vaginal birth-cephalic-non instrumental,VD
+VC01_114,114,QFC071,SGA,Vicki,526.5,265,35,Caucasian,21.08,0,5,Male,2552,Vaginal birth,VD
+VC01_115,115,QFC114,SGA,Vicki,579.3,267,31,Southern and Central Asia,24.03,0,4,Male,2556,Vaginal birth,VD
+VC01_116,116,QFC107,SGA,Vicki,517.2,267,34,Southern and Central Asia,18.81,1,4,Male,2533,Caesarean Section,CS
+VC01_117,117,QFC151,SGA,Vicki,630.7,259,32,Caucasian,16.79,0,7,Male,2476,Vaginal,VD
+VC01_118,118,QFC276,SGA,Vicki,679.7,266,32,Caucasian,29.34,1,12,Female,2726,Vaginal,VD
+VC01_119,119,QFC357,SGA,Vicki,436,258,32,Caucasian,25.14,1,3,Female,2333,Caesarean section,CS
+VC01_120,120,QFC140,SGA,Vicki,528.6,244,24,Caucasian/Pacific Islander,33.22,0,28,Male,2340,Vaginal birth,VD
+VC01_121,121,QFC304,SGA,Vicki,576.4,276,29,Caucasian/South East Asian,52.05,2,7,Male,2806,Caesarean section,CS
+VC01_122,122,QFC024,SGA,Vicki,,265,31,Caucasian,30.48,1,99,Female,4008,,
+VC01_123,123,QFC132,SGA,Vicki,613.2,287,35,Caucasian,21.95,0,19,Male,3106,Vaginal birth,VD
+VC01_124,124,QFC089,SGA,Vicki,592.3,256,35,SE Asian,21.26,0,6,Female,2342,Vaginal birth,VD
+VC01_55,55,M2750,AGA,Martha,,268,35,Australia,35,3,,Female,4080,Caesarean Section not in labour,CS
+VC01_59,59,V1_077,AGA,Stacey,,273,35,India,30,2,96,Female,3710,Caesarean Section,CS
+VC01_1,1,M2170,AGA,Martha,,265,26,Australia,33.3,2,>90th,Female,3880,Caesarean Section not in labour,CS
+VC01_10,10,M1811,AGA,Martha,,269,25,Australia - European (AUE),28.7,1,86.6,Female,3800,Normal vaginal delivery,VD
+VC01_12,12,M2642,AGA,Martha,770,271,25,Australia,45.9,4,>90th,Male,4630,Caesarean Section not in labour,CS
+VC01_16,16,23A,AGA,Sharon,,273,37,Caucasian,22,1,,Male,3845,Caesarean Section,CS
+VC01_17,17,M1590,AGA,Martha,630,266,27,Australia,21.7,4,>90th,Male,3990,Normal vaginal delivery,VD
+VC01_2,2,M2820,AGA,Martha,750,266,35,Australia (Caucasian),33.8,2,99.6,Female,4480,Caesarean Section not in labour,CS
+VC01_20,20,V1_111,AGA,Stacey,,285,30,Australia,34,3,94.5,Male,4680,Vaginal,VD
+VC01_21,21,M1424,SGA,Martha,,275,35,Australia,20.1,3,<10th,Female,2490,Caesarean Section not in labour,CS
+VC01_22,22,M3005,SGA,Martha,530,259,33,Australia (Lebanese),29.1,3+1,,Female,2430,Caesarean Section not in labour,CS
+VC01_24,24,16,SGA,Sharon,,274,33,Taiwan/Australain,19.7,2,<3,Female,2500,Caesarean Section,CS
+VC01_29,29,V1_172,SGA,Stacey,,275,38,Australia,23.3,1,7.8,Female,2620,Vaginal birth-cephalic-assisted instrumental,VD
+VC01_30,30,V1_181,SGA,Stacey,,269,30,China,19.5,2,2.4,Female,2470,Vaginal birth-cephalic-non instrumental,VD
+VC01_31,31,M1580,SGA,Martha,492,259,35,Australia,17.6,1,10-90th,Male,2460,Caesarean Section in labour,CS
+VC01_32,32,M2454,SGA,Martha,,263,40,Australia (Mediterranean),32.8,1,,Male,2430,Caesarean Section not in labour,CS
+VC01_9,9,M1209,AGA,Martha,,280,32,Australia - European (AUE),,3,71.8,Female,3770,Normal vaginal delivery,VD
