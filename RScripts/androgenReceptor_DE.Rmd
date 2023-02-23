@@ -210,8 +210,8 @@ samples$Study <- factor(
     "Stacey",
     "Olivia",
     "Vicki"
+    )
   )
-)
 
 ```
 
@@ -379,8 +379,8 @@ for (i in 1:nsamples){
 
 ```{r drop low expression genes}
 
-# drop genes that don't have an official gene symbol
-dge_noY <- dge_dropped[rownames(dplyr::filter(dge_dropped$genes, seqnames != "Y")), ]
+# drop genes on the Y chromosome
+# dge_noY <- dge_dropped[rownames(dplyr::filter(dge_dropped$genes, seqnames != "Y")), ]
 
 
 ```
@@ -409,47 +409,47 @@ dge_noY <- dge_dropped[rownames(dplyr::filter(dge_dropped$genes, seqnames != "Y"
 ```{r sex specific DE sex_pathology}
 
 # establish the design matrix
-design_mRNA_sex_SGA <- model.matrix(~0 + sex_pathology + maternalAge,
-                                    data = dge$samples)
+# design_mRNA_sex_SGA <- model.matrix(~0 + sex_pathology + maternalAge,
+#                                     data = dge$samples)
 
 # make the column names a little nicer
-colnames(design_mRNA_sex_SGA) <- c("Female_AGA",
-                                   "Male_AGA",
-                                   "Female_SGA",
-                                   "Male_SGA",
-                                   "Female_10_30th",
-                                   "Male_10_30th",
-                                   "maternalAge")
+# colnames(design_mRNA_sex_SGA) <- c("Female_AGA",
+#                                    "Male_AGA",
+#                                    "Female_SGA",
+#                                    "Male_SGA",
+#                                    "Female_10_30th",
+#                                    "Male_10_30th",
+#                                    "maternalAge")
 
 # perform the voom quality weights
-voom_mRNA_sex_SGA <- voom(dge, design_mRNA_sex_SGA, plot = TRUE)
+# voom_mRNA_sex_SGA <- voom(dge, design_mRNA_sex_SGA, plot = TRUE)
 # fit the linear model
-fit_mRNA_sex_SGA <- lmFit(voom_mRNA_sex_SGA, design_mRNA_sex_SGA)
+# fit_mRNA_sex_SGA <- lmFit(voom_mRNA_sex_SGA, design_mRNA_sex_SGA)
 
 # check the decide test
-summary(decideTests(fit_mRNA_sex_SGA)) # before FDR correction
+# summary(decideTests(fit_mRNA_sex_SGA)) # before FDR correction
 
 # set the contrasts - this makes it easier to "see" what we're testing
-contrast_mRNA_sex_SGA <- makeContrasts(female_SGA = Female_SGA-Female_AGA,
-                                       male_SGA = Male_SGA-Male_AGA,
-                                       levels = design_mRNA_sex_SGA)
+# contrast_mRNA_sex_SGA <- makeContrasts(female_SGA = Female_SGA-Female_AGA,
+#                                        male_SGA = Male_SGA-Male_AGA,
+#                                        levels = design_mRNA_sex_SGA)
 
 # fit a linear regression to the contrast questions
-fit_mRNA_sex_SGA <- contrasts.fit(fit_mRNA_sex_SGA, contrast_mRNA_sex_SGA)
+# fit_mRNA_sex_SGA <- contrasts.fit(fit_mRNA_sex_SGA, contrast_mRNA_sex_SGA)
 
 # perform bayesian adjustment
-fit_mRNA_sex_SGA <- eBayes(fit_mRNA_sex_SGA)
+# fit_mRNA_sex_SGA <- eBayes(fit_mRNA_sex_SGA)
 
 # summary table of the sex SGA fit
-summary(decideTests(fit_mRNA_sex_SGA,
-                    adjust.method = "fdr",
-                    p.value = 0.05))
+# summary(decideTests(fit_mRNA_sex_SGA,
+#                     adjust.method = "fdr",
+#                     p.value = 0.05))
 
 # all DE results for the female_SGA comparison
-allTable_female_SGA <- topTable(fit_mRNA_sex_SGA,
-                             coef = 1,
-                             n = Inf,
-                             sort = "p")
+# allTable_female_SGA <- topTable(fit_mRNA_sex_SGA,
+#                              coef = 1,
+#                              n = Inf,
+#                              sort = "p")
 
 # saveRDS(allTable_female_SGA,
 #         file = "differentialExpressionFiles/allTable_female_SGA.Rds")
@@ -458,18 +458,18 @@ allTable_female_SGA <- topTable(fit_mRNA_sex_SGA,
 #                     "differentialExpressionFiles/allTable_female_SGA")
 
 # only significant (after fdr correction) DE results for the female_SGA comparison
-topTable_female_SGA <- topTable(fit_mRNA_sex_SGA,
-                             coef = 1,
-                             n = Inf,
-                             sort = "p",
-                             p = 0.05,
-                             adjust.method = "fdr") # requires eBayes.
+# topTable_female_SGA <- topTable(fit_mRNA_sex_SGA,
+#                              coef = 1,
+#                              n = Inf,
+#                              sort = "p",
+#                              p = 0.05,
+#                              adjust.method = "fdr") # requires eBayes.
 
 # all DE results for the female_SGA comparison
-allTable_male_SGA <- topTable(fit_mRNA_sex_SGA,
-                             coef = 2,
-                             n = Inf,
-                             sort = "p")
+# allTable_male_SGA <- topTable(fit_mRNA_sex_SGA,
+#                              coef = 2,
+#                              n = Inf,
+#                              sort = "p")
 
 # saveRDS(allTable_male_SGA,
 #         file = "differentialExpressionFiles/allTable_male_SGA.Rds")
@@ -478,12 +478,12 @@ allTable_male_SGA <- topTable(fit_mRNA_sex_SGA,
 #                     "differentialExpressionFiles/allTable_male_SGA")
 
 # only significant (after fdr correction) DE results for the female_SGA comparison
-topTable_male_SGA <- topTable(fit_mRNA_sex_SGA,
-                             coef = 2,
-                             n = Inf,
-                             sort = "p",
-                             p = 0.05,
-                             adjust.method = "fdr") # requires eBayes.
+# topTable_male_SGA <- topTable(fit_mRNA_sex_SGA,
+#                              coef = 2,
+#                              n = Inf,
+#                              sort = "p",
+#                              p = 0.05,
+#                              adjust.method = "fdr") # requires eBayes.
 
 ```
 
@@ -493,51 +493,51 @@ topTable_male_SGA <- topTable(fit_mRNA_sex_SGA,
 ```{r sex specific DE sex_pathology dropped}
 
 # establish the design matrix
-design_mRNA_sex_SGA_dropped <- model.matrix(~0 + sex_pathology,
-                                    data = dge_dropped$samples)
+# design_mRNA_sex_SGA_dropped <- model.matrix(~0 + sex_pathology,
+#                                     data = dge_dropped$samples)
 
 # make the column names a little nicer
-colnames(design_mRNA_sex_SGA_dropped) <- c("Female_AGA",
-                                           "Male_AGA",
-                                           "Female_SGA",
-                                           "Male_SGA",
-                                           "Female_10_30th",
-                                           "Male_10_30th")
+# colnames(design_mRNA_sex_SGA_dropped) <- c("Female_AGA",
+#                                            "Male_AGA",
+#                                            "Female_SGA",
+#                                            "Male_SGA",
+#                                            "Female_10_30th",
+#                                            "Male_10_30th")
 
 # perform the voom quality weights
-voom_mRNA_sex_SGA_dropped <- voom(dge_dropped,
-                                  design_mRNA_sex_SGA_dropped,
-                                  plot = TRUE)
+# voom_mRNA_sex_SGA_dropped <- voom(dge_dropped,
+#                                   design_mRNA_sex_SGA_dropped,
+#                                   plot = TRUE)
 # fit the linear model
-fit_mRNA_sex_SGA_dropped <- lmFit(
-  voom_mRNA_sex_SGA_dropped, design_mRNA_sex_SGA_dropped)
+# fit_mRNA_sex_SGA_dropped <- lmFit(
+#   voom_mRNA_sex_SGA_dropped, design_mRNA_sex_SGA_dropped)
 
 # check the decide test
-summary(decideTests(fit_mRNA_sex_SGA_dropped)) # before FDR correction
+# summary(decideTests(fit_mRNA_sex_SGA_dropped)) # before FDR correction
 
 # set the contrasts - this makes it easier to "see" what we're testing
-contrast_mRNA_sex_SGA_dropped <- makeContrasts(
-  female_SGA = Female_SGA-Female_AGA,
-  male_SGA = Male_SGA-Male_AGA,
-  levels = design_mRNA_sex_SGA_dropped)
+# contrast_mRNA_sex_SGA_dropped <- makeContrasts(
+#   female_SGA = Female_SGA-Female_AGA,
+#   male_SGA = Male_SGA-Male_AGA,
+#   levels = design_mRNA_sex_SGA_dropped)
 
 # fit a linear regression to the contrast questions
-fit_mRNA_sex_SGA_dropped <- contrasts.fit(fit_mRNA_sex_SGA_dropped,
-                                          contrast_mRNA_sex_SGA_dropped)
+# fit_mRNA_sex_SGA_dropped <- contrasts.fit(fit_mRNA_sex_SGA_dropped,
+#                                           contrast_mRNA_sex_SGA_dropped)
 
 # perform bayesian adjustment
-fit_mRNA_sex_SGA_dropped <- eBayes(fit_mRNA_sex_SGA_dropped)
+# fit_mRNA_sex_SGA_dropped <- eBayes(fit_mRNA_sex_SGA_dropped)
 
 # summary table of the sex SGA fit
-summary(decideTests(fit_mRNA_sex_SGA_dropped,
-                    adjust.method = "fdr",
-                    p.value = 0.05))
+# summary(decideTests(fit_mRNA_sex_SGA_dropped,
+#                     adjust.method = "fdr",
+#                     p.value = 0.05))
 
 # all DE results for the female_SGA comparison
-allTable_female_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
-                             coef = 1,
-                             n = Inf,
-                             sort = "p")
+# allTable_female_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
+#                              coef = 1,
+#                              n = Inf,
+#                              sort = "p")
 
 # saveRDS(allTable_female_SGA,
 #         file = "differentialExpressionFiles/allTable_female_SGA_dropped.Rds")
@@ -546,18 +546,18 @@ allTable_female_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
 #                     "differentialExpressionFiles/allTable_female_SGA_dropped")
 
 # only significant (after fdr correction) DE results for the female_SGA comparison
-topTable_female_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
-                             coef = 1,
-                             n = Inf,
-                             sort = "p",
-                             p = 0.05,
-                             adjust.method = "fdr") # requires eBayes.
+# topTable_female_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
+#                              coef = 1,
+#                              n = Inf,
+#                              sort = "p",
+#                              p = 0.05,
+#                              adjust.method = "fdr") # requires eBayes.
 
 # all DE results for the female_SGA comparison
-allTable_male_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
-                             coef = 2,
-                             n = Inf,
-                             sort = "p")
+# allTable_male_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
+#                              coef = 2,
+#                              n = Inf,
+#                              sort = "p")
 
 # saveRDS(allTable_male_SGA,
 #         file = "differentialExpressionFiles/allTable_male_SGA_dropped.Rds")
@@ -566,12 +566,12 @@ allTable_male_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
 #                     "differentialExpressionFiles/allTable_male_SGA_dropped")
 
 # only significant (after fdr correction) DE results for the female_SGA comparison
-topTable_male_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
-                             coef = 2,
-                             n = Inf,
-                             sort = "p",
-                             p = 0.05,
-                             adjust.method = "fdr") # requires eBayes.
+# topTable_male_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
+#                              coef = 2,
+#                              n = Inf,
+#                              sort = "p",
+#                              p = 0.05,
+#                              adjust.method = "fdr") # requires eBayes.
 
 ```
 
@@ -580,51 +580,51 @@ topTable_male_SGA_dropped <- topTable(fit_mRNA_sex_SGA_dropped,
 ```{r sex specific DE sex_pathology noY}
 
 # establish the design matrix
-design_mRNA_sex_SGA_noY <- model.matrix(~0 + sex_pathology,
-                                    data = dge_noY$samples)
+# design_mRNA_sex_SGA_noY <- model.matrix(~0 + sex_pathology,
+#                                     data = dge_noY$samples)
 
 # make the column names a little nicer
-colnames(design_mRNA_sex_SGA_noY) <- c("Female_AGA",
-                                       "Male_AGA",
-                                       "Female_SGA",
-                                       "Male_SGA",
-                                       "Female_10_30th",
-                                       "Male_10_30th")
+# colnames(design_mRNA_sex_SGA_noY) <- c("Female_AGA",
+#                                        "Male_AGA",
+#                                        "Female_SGA",
+#                                        "Male_SGA",
+#                                        "Female_10_30th",
+#                                        "Male_10_30th")
 
 # perform the voom quality weights
-voom_mRNA_sex_SGA_noY <- voom(dge_noY,
-                                  design_mRNA_sex_SGA_noY,
-                                  plot = TRUE)
+# voom_mRNA_sex_SGA_noY <- voom(dge_noY,
+#                                   design_mRNA_sex_SGA_noY,
+#                                   plot = TRUE)
 # fit the linear model
-fit_mRNA_sex_SGA_noY <- lmFit(
-  voom_mRNA_sex_SGA_noY, design_mRNA_sex_SGA_noY)
+# fit_mRNA_sex_SGA_noY <- lmFit(
+#   voom_mRNA_sex_SGA_noY, design_mRNA_sex_SGA_noY)
 
 # check the decide test
-summary(decideTests(fit_mRNA_sex_SGA_noY)) # before FDR correction
+# summary(decideTests(fit_mRNA_sex_SGA_noY)) # before FDR correction
 
 # set the contrasts - this makes it easier to "see" what we're testing
-contrast_mRNA_sex_SGA_noY <- makeContrasts(
-  female_SGA = Female_SGA-Female_AGA,
-  male_SGA = Male_SGA-Male_AGA,
-  levels = design_mRNA_sex_SGA_noY)
+# contrast_mRNA_sex_SGA_noY <- makeContrasts(
+#   female_SGA = Female_SGA-Female_AGA,
+#   male_SGA = Male_SGA-Male_AGA,
+#   levels = design_mRNA_sex_SGA_noY)
 
 # fit a linear regression to the contrast questions
-fit_mRNA_sex_SGA_noY <- contrasts.fit(fit_mRNA_sex_SGA_noY,
-                                          contrast_mRNA_sex_SGA_noY)
+# fit_mRNA_sex_SGA_noY <- contrasts.fit(fit_mRNA_sex_SGA_noY,
+#                                           contrast_mRNA_sex_SGA_noY)
 
 # perform bayesian adjustment
-fit_mRNA_sex_SGA_noY <- eBayes(fit_mRNA_sex_SGA_noY)
+# fit_mRNA_sex_SGA_noY <- eBayes(fit_mRNA_sex_SGA_noY)
 
 # summary table of the sex SGA fit
-summary(decideTests(fit_mRNA_sex_SGA_noY,
-                    adjust.method = "fdr",
-                    p.value = 0.05))
+# summary(decideTests(fit_mRNA_sex_SGA_noY,
+#                     adjust.method = "fdr",
+#                     p.value = 0.05))
 
 # all DE results for the female_SGA comparison
-allTable_female_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
-                             coef = 1,
-                             n = Inf,
-                             sort = "p")
+# allTable_female_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
+#                              coef = 1,
+#                              n = Inf,
+#                              sort = "p")
 
 # saveRDS(allTable_female_SGA,
 #         file = "differentialExpressionFiles/allTable_female_SGA_noY.Rds")
@@ -633,36 +633,36 @@ allTable_female_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
 #                     "differentialExpressionFiles/allTable_female_SGA_noY")
 
 # only significant (after fdr correction) DE results for the female_SGA comparison
-topTable_female_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
-                             coef = 1,
-                             n = Inf,
-                             sort = "p",
-                             p = 0.05,
-                             adjust.method = "fdr") # requires eBayes.
+# topTable_female_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
+#                              coef = 1,
+#                              n = Inf,
+#                              sort = "p",
+#                              p = 0.05,
+#                              adjust.method = "fdr") # requires eBayes.
 
 # all DE results for the female_SGA comparison
-allTable_male_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
-                             coef = 2,
-                             n = Inf,
-                             sort = "p")
+# allTable_male_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
+#                              coef = 2,
+#                              n = Inf,
+#                              sort = "p")
 
 # saveRDS(allTable_male_SGA,
 #         file = "differentialExpressionFiles/allTable_male_SGA_noY.Rds")
 # 
-writexl::write_xlsx(as.data.frame(allTable_male_SGA),
-                    "cleanData/allTable_male_SGA_noY.xlsx")
+# writexl::write_xlsx(as.data.frame(allTable_male_SGA),
+#                     "cleanData/allTable_male_SGA_noY.xlsx")
 
 # only significant (after fdr correction) DE results for the female_SGA comparison
-topTable_male_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
-                             coef = 2,
-                             n = Inf,
-                             sort = "p",
-                             p = 0.05,
-                             adjust.method = "fdr") # requires eBayes.
+# topTable_male_SGA_noY <- topTable(fit_mRNA_sex_SGA_noY,
+#                              coef = 2,
+#                              n = Inf,
+#                              sort = "p",
+#                              p = 0.05,
+#                              adjust.method = "fdr") # requires eBayes.
 
 ```
 
-### DESeq2 differential expression
+cit### DESeq2 differential expression
 
 ```{r DESeq2 differential expression}
 
@@ -670,14 +670,15 @@ library(DESeq2)
 # establish DESeq2 object
 dds <- DESeqDataSetFromMatrix(countData = grch38_mRNA_placenta_counts,
                               colData = samples,
-                              design= ~ sex_pathology)
+                              design = ~ sex_pathology)
 # filter for genes with low expression
 # 7 samples in smallest group (Female_10_30th)
 keep <- rowSums(counts(dds) >= 10) >= 7
 dds <- dds[keep,]
 
-# estimate size factors and dispersions
-# fit and model test
+# 1. estimate size factors (controlling for differences in the counts due varying sequencing depth of the samples)
+# 2. and dispersions (The dispersion parameter captures how much the counts for the samples will vary around an expected value. Note that the expected value takes into consideration the sequencing depth and differences that can be attributed to variables in the design formula.)
+# 3. Fitting a final generalized linear model using the size factors and dispersion values estimated above, which gives estimates of the log fold change.
 dds <- DESeq(dds)
 
 # lists the coefficients
@@ -830,6 +831,25 @@ resSig_sex_pathology_Female_SGA_vs_Female_10_30 <- as.data.frame(res_sex_patholo
 
 ```
 
+### plot top DE genes
+
+```{r plot de genes}
+
+# topGene <- rownames(res_sex_pathology_Female_SGA_vs_Female_10_30)[which.min(res_sex_pathology_Female_SGA_vs_Female_10_30$padj)]
+# 
+# geneCounts <- plotCounts(dds, gene=topGene, intgroup=c("sex_pathology"), returnData=TRUE)
+# ggplot(geneCounts, aes(x=sex_pathology, y=count, color = sex_pathology)) +
+#   scale_y_log10() +
+#   geom_point(position=position_jitter(width=.1,height=0), size=3)
+# 
+# ggplot(geneCounts, aes(x=sex_pathology, y=count, fill=sex_pathology)) +
+#   scale_y_log10() +
+#   geom_dotplot(binaxis = "y", stackdir = "center")
+# 
+# hist(res_sex_pathology_Female_SGA_vs_Female_10_30$pvalue[res_sex_pathology_Female_SGA_vs_Female_10_30$baseMean > 1], breaks=0:20/20, col="grey50", border="white")
+             
+```
+
 ### convert results to data frames and save
 
 ```{r convert and save}
@@ -895,7 +915,7 @@ Female_SGA_vs_Female_10_30 <- data.frame(res_sex_pathology_Female_SGA_vs_Female_
                          arrange(., padj)
 
 
-require(openxlsx)
+# require(openxlsx)
 list_of_datasets <- list("Male_AGA_vs_Female_AGA" = Male_AGA_vs_Female_AGA,
                          "Male_AGA_vs_Male_SGA" = Male_AGA_vs_Male_SGA,
                          "Male_AGA_vs_Female_SGA" = Male_AGA_vs_Female_SGA,
@@ -912,8 +932,132 @@ list_of_datasets <- list("Male_AGA_vs_Female_AGA" = Male_AGA_vs_Female_AGA,
                          "Female_AGA_vs_Female_10_30" = Female_AGA_vs_Female_10_30,
                          "Female_SGA_vs_Female_10_30" = Female_SGA_vs_Female_10_30
                          )
-write.xlsx(list_of_datasets, file = "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/ARE_DE.xlsx")
+# write.xlsx(list_of_datasets, file = "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/ARE_DE.xlsx")
 
+
+```
+
+### files for GSEA loop
+
+```{r files for GSEA loop}
+
+comparisons <- c("Male_AGA_vs_Female_AGA",
+                 "Male_AGA_vs_Male_SGA",
+                 "Male_AGA_vs_Female_SGA",
+                 "Male_AGA_vs_Male_10_30",
+                 "Male_AGA_vs_Female_10_30",
+                 "Male_SGA_vs_Female_AGA",
+                 "Male_SGA_vs_Female_SGA",
+                 "Male_SGA_vs_Male_10_30",
+                 "Male_SGA_vs_Female_10_30",
+                 "Male_10_30_vs_Female_AGA",
+                 "Male_10_30_vs_Female_SGA",
+                 "Male_10_30_vs_Female_10_30",
+                 "Female_AGA_vs_Female_SGA",
+                 "Female_AGA_vs_Female_10_30",
+                 "Female_SGA_vs_Female_10_30"
+                 )
+
+# import the list of full/half sites for the androgen receptor
+# this files is from Ash
+ARE_sites <- read.table(file = "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/AREs.txt",
+                        header = TRUE,
+                        sep = "\t")
+
+for (i in 1:length(comparisons)){
+  
+  # set which column are we interested in
+  sites <- "Genes.Negatively.regulated.by.ARE.half.sites"
+  # set path
+  path <- "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/negativeHalfSites/"
+  # set the output file name for later when we save each table
+  outputFilename <- paste(comparisons[i], sites, sep = "_") 
+  # testing each file name
+  # print(outputFilename)
+  
+  # copy the DE table and drop rows with NAs in the padj
+  # note: DESeq2 will assign NA to the padj column if all samples in the comparison has zero counts for the gene
+  # grab only the comparison we want
+  comparison <- na.omit(list_of_datasets[[i]])
+  
+  # subset the table to only contain genes selected column of ARE_sites
+  assign(paste0("comparison_", comparisons[i]),
+         dplyr::filter(comparison,
+                       gene %in% ARE_sites$Genes.Positively.regulated.by.ARE.full.sites))
+  
+  # make the GSEA rank file
+  gsea <- get(print(paste0("comparison_", comparisons[i]), quote = FALSE))
+  # create a new column of GSEA ranking metric
+  gsea["Rank_log"] <- (sign(gsea$log2FoldChange)) * (-log(gsea$padj, 10))
+  gsea <- dplyr::arrange(gsea, desc(Rank_log))
+  gsea_list <- gsea$Rank_log 
+  names(gsea_list) <- gsea$gene
+  
+  write_delim(dplyr::select(gsea, gene, Rank_log),
+              file = paste0(path, outputFilename, "_gseaRank", ".rnk"),
+              delim = "\t")
+  
+}
+```
+
+### files for GSEA individual
+
+```{r files for GSEA}
+
+# # copy the DE table and drop rows with NAs in the padj
+# # note: DESeq2 will assign NA to the padj column if all samples in the comparison has zero counts for the gene
+# comparison <- na.omit(Male_AGA_vs_Male_SGA)
+# filename <- "Male_AGA_vs_Male_SGA"
+# 
+# # make the GSEA rank file
+# gsea <- comparison
+# 
+# # create a new column of GSEA ranking metric
+# gsea["Rank_log"] <- (sign(gsea$log2FoldChange)) * (-log(gsea$padj,10))
+# gsea <- dplyr::arrange(gsea, desc(Rank_log))
+# gsea_list <- gsea$Rank_log 
+# names(gsea_list) <- gsea$gene
+# 
+# write_delim(dplyr::select(gsea, gene, Rank_log),
+#             file = paste0("~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/",
+#                           filename, "_gseaRank", ".rnk"),
+#             delim = "\t")
+
+
+```
+
+### ARE subset files for GSEA
+
+```{r files for ARE subset GSEA}
+
+# # import the list of full/half sites for the androgen receptor
+# # this files is from Ash
+# ARE_sites <- read.table(file = "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/AREs.txt",
+#                         header = TRUE,
+#                         sep = "\t")
+# 
+# # set the file name for saved tables
+# outputFilename <- paste0(comparisons[1], "_fullSites")
+# 
+# # copy the DE table and drop rows with NAs in the padj
+# # note: DESeq2 will assign NA to the padj column if all samples in the comparison has zero counts for the gene
+# comparison <- na.omit(Male_SGA_vs_Male_10_30)
+# # subset the table to only contain genes with the full site
+# comparison_ARE_full <- dplyr::filter(comparison,
+#                                      gene %in% ARE_sites$Genes.Positively.regulated.by.ARE.full.sites)
+# 
+# # make the GSEA rank file
+# gsea_fullSite <- comparison
+# # create a new column of GSEA ranking metric
+# gsea_fullSite["Rank_log"] <- (sign(gsea_fullSite$log2FoldChange)) * (-log(gsea_fullSite$padj,10))
+# gsea_fullSite <- dplyr::arrange(gsea_fullSite, desc(Rank_log))
+# gsea_fullSite_list <- gsea_fullSite$Rank_log 
+# names(gsea_fullSite_list) <- gsea_fullSite$gene
+# 
+# write_delim(dplyr::select(gsea_fullSite, gene, Rank_log),
+#             file = paste0("~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/",
+#                           outputFilename, "_gseaRank", ".rnk"),
+            delim = "\t")
 
 
 ```
