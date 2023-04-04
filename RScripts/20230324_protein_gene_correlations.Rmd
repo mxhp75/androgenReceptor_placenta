@@ -269,6 +269,10 @@ melt(t(proteinCounts)) %>%
 # subset the dge list to only include samples with protein counts
 subset_dge <- dge_dropped[, colnames(proteinCounts)]
 
+# create a df of log2 gene counts for all genes
+cpmCounts <- edgeR::cpm(subset_dge, log = TRUE)
+
+
 ```
 
 ### import the list of full/half sites for the androgen receptor
@@ -285,12 +289,18 @@ ARE_full <- data.frame(geneName = unique(ARE_sites$All.genes.containing.ARE.full
 
 positive_ARE_full <- data.frame(geneName = unique(ARE_sites$Genes.Positively.regulated.by.ARE.full.sites)) %>% 
   dplyr::filter(., geneName %in% rownames(dge_dropped))
+
+negative_ARE_full <- data.frame(geneName = unique(ARE_sites$Genes.Negatively.regulated.by.ARE.full.sites)) %>% 
+  dplyr::filter(., geneName %in% rownames(dge_dropped))
   
 # create a df of log2 gene counts ARE full
 cpmCounts_ARE_full <- edgeR::cpm(subset_dge[ARE_full$geneName, ], log = TRUE)
 
 # create a df of log2 gene counts positive ARE full
 cpmCounts_positive_ARE_full <- edgeR::cpm(subset_dge[positive_ARE_full$geneName, ], log = TRUE)
+
+# create a df of log2 gene counts negative ARE full
+cpmCounts_negative_ARE_full <- edgeR::cpm(subset_dge[negative_ARE_full$geneName, ], log = TRUE)
 
 # create a column annotation df
 annotation <- subset_dge$samples %>%
@@ -330,6 +340,21 @@ pheatmap(cpmCounts_positive_ARE_full,
          scale = "row",
          show_rownames = FALSE)
 
+pheatmap(cpmCounts_negative_ARE_full,
+         annotation_col = dplyr::select(annotation, -samplename),
+         main = "Gene Expresson negative ARE Full Site (log2 CPM)",
+         cluster_rows = TRUE,
+         cluster_cols = TRUE,
+         show_rownames = FALSE)
+
+pheatmap(cpmCounts_negative_ARE_full,
+         annotation_col = dplyr::select(annotation, -samplename),
+         main = "Gene Expresson negative ARE Full Site (row scaled)",
+         cluster_rows = TRUE,
+         cluster_cols = TRUE,
+         scale = "row",
+         show_rownames = FALSE)
+
 # quick heatmap of protein counts
 pheatmap(proteinCounts,
          main = "Protein Abundance",
@@ -341,22 +366,242 @@ pheatmap(proteinCounts,
 
 ```
 
-## Correlations (Pearson's)
+## Correlations - all samples (Pearson's)
 
 ```{r correlation}
 
 # convert counts/abunance to df
-x2 <- data.frame(t(proteinCounts))
-y2 <- data.frame(t(cpmCounts))
+x1 <- data.frame(t(proteinCounts))
+y1 <- data.frame(t(cpmCounts))
+
 # perform all v all correlations
-cor_x2y2 <- cor(x2, y2)
+cor_x1y1 <- cor(x1, y1)
+
 # plot all v all correlations
-pheatmap(t(cor_x2y2),
+pheatmap(t(cor_x1y1),
          main = "Protein:Gene correlations (all v all Pearson's)",
          show_rownames = FALSE,
          cluster_rows = TRUE,
-         cluster_cols = TRUE,
-         scale = "row")
+         cluster_cols = TRUE)
 
+# new df of ARE full site expression
+y2 <- data.frame(t(cpmCounts_ARE_full))
+
+# perform all protein v positive ARE full correlations
+cor_x1y2 <- cor(x1, y2)
+# plot all v all correlations
+pheatmap(t(cor_x1y2),
+         main = "Protein:Gene correlations (all protein v ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of positive ARE full site expression
+y3 <- data.frame(t(cpmCounts_positive_ARE_full))
+
+# perform all protein v positive ARE full correlations
+cor_x1y3 <- cor(x1, y3)
+# plot all v all correlations
+pheatmap(t(cor_x1y3),
+         main = "Protein:Gene correlations (all protein v positive ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of negative ARE full site expression
+y4 <- data.frame(t(cpmCounts_negative_ARE_full))
+
+# perform all protein v positive ARE full correlations
+cor_x1y4 <- cor(x1, y4)
+# plot all v all correlations
+pheatmap(t(cor_x1y4),
+         main = "Protein:Gene correlations (all protein v negative ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+```
+
+## Correlations - only SGA samples (Pearson's)
+
+```{r correlation SGA only}
+
+# convert counts/abunance to df
+x_SGA1 <- data.frame(t(proteinCounts)) %>% 
+  dplyr::filter(., rownames(.) %notin% "VC01_37")
+y_SGA1 <- data.frame(t(cpmCounts)) %>% 
+  dplyr::filter(., rownames(.) %notin% "VC01_37")
+
+# perform all v all correlations
+cor_x_SGA1y_SGA1 <- cor(x_SGA1, y_SGA1)
+
+# plot SGA samples only all v all correlations
+pheatmap(t(cor_x_SGA1y_SGA1),
+         main = "Protein:Gene correlations (SGA - all v all Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of ARE full site expression
+y_SGA2 <- data.frame(t(cpmCounts_ARE_full)) %>% 
+  dplyr::filter(., rownames(.) %notin% "VC01_37")
+
+# perform SGA samples only, all protein v positive ARE full correlations
+cor_x_SGA1y_SGA2 <- cor(x_SGA1, y_SGA2)
+# plot all v all correlations
+pheatmap(t(cor_x_SGA1y_SGA2),
+         main = "Protein:Gene correlations (SGA - all protein v ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of positive ARE full site expression
+y_SGA3 <- data.frame(t(cpmCounts_positive_ARE_full)) %>% 
+  dplyr::filter(., rownames(.) %notin% "VC01_37")
+
+# perform SGA samples only all protein v positive ARE full correlations
+cor_x_SGA1y_SGA3 <- cor(x_SGA1, y_SGA3)
+# plot all v all correlations
+pheatmap(t(cor_x_SGA1y_SGA3),
+         main = "Protein:Gene correlations (SGA - all protein v positive ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of negative ARE full site expression
+y_SGA4 <- data.frame(t(cpmCounts_negative_ARE_full)) %>% 
+  dplyr::filter(., rownames(.) %notin% "VC01_37")
+
+# perform all protein v positive ARE full correlations
+cor_x_SGA1y_SGA4 <- cor(x_SGA1, y_SGA4)
+# plot all v negative ARE full correlations
+pheatmap(t(cor_x_SGA1y_SGA4),
+         main = "Protein:Gene correlations (SGA - all protein v negative ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+```
+
+## Correlations - only male SGA samples (Pearson's)
+
+```{r correlation male SGA only}
+
+# convert counts/abunance to df
+x_male_SGA1 <- data.frame(t(proteinCounts)) %>% 
+  dplyr::filter(., rownames(.) %in% c("VC01_74", "VC01_78", "VC01_79"))
+y_male_SGA1 <- data.frame(t(cpmCounts)) %>% 
+  dplyr::filter(., rownames(.) %in% c("VC01_74", "VC01_78", "VC01_79"))
+
+# perform all v all correlations
+cor_x_male_SGA1_y_male_SGA1 <- cor(x_male_SGA1, y_male_SGA1)
+
+# plot SGA samples only all v all correlations
+pheatmap(t(cor_x_male_SGA1_y_male_SGA1),
+         main = "Protein:Gene correlations (male SGA - all v all Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of ARE full site expression
+y_male_SGA2 <- data.frame(t(cpmCounts_ARE_full)) %>% 
+  dplyr::filter(., rownames(.) %in% c("VC01_74", "VC01_78", "VC01_79"))
+
+# perform SGA samples only, all protein v positive ARE full correlations
+cor_x_male_SGA1_y_male_SGA2 <- cor(x_male_SGA1, y_male_SGA2)
+# plot all v all correlations
+pheatmap(t(cor_x_male_SGA1_y_male_SGA2),
+         main = "Protein:Gene correlations (male SGA - all protein v ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of positive ARE full site expression
+y_male_SGA3 <- data.frame(t(cpmCounts_positive_ARE_full)) %>% 
+  dplyr::filter(., rownames(.) %in% c("VC01_74", "VC01_78", "VC01_79"))
+
+# perform SGA samples only all protein v positive ARE full correlations
+cor_x_male_SGA1_y_male_SGA3 <- cor(x_male_SGA1, y_male_SGA3)
+# plot all v all correlations
+pheatmap(t(cor_x_male_SGA1_y_male_SGA3),
+         main = "Protein:Gene correlations (male SGA - all protein v positive ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of negative ARE full site expression
+y_male_SGA4 <- data.frame(t(cpmCounts_negative_ARE_full)) %>% 
+  dplyr::filter(., rownames(.) %in% c("VC01_74", "VC01_78", "VC01_79"))
+
+# perform all protein v positive ARE full correlations
+cor_x_male_SGA1_y_male_SGA4 <- cor(x_male_SGA1, y_male_SGA4)
+# plot all v negative ARE full correlations
+pheatmap(t(cor_x_male_SGA1_y_male_SGA4),
+         main = "Protein:Gene correlations (male SGA - all protein v negative ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+```
+
+## Correlations - only female SGA samples (Pearson's)
+
+```{r correlation female SGA only}
+
+# convert counts/abunance to df
+x_female_SGA1 <- data.frame(t(proteinCounts)) %>% 
+  dplyr::filter(., rownames(.) %in% c("VC01_28", "VC01_23", "VC01_73", "VC01_75", "VC01_76", "VC01_77"))
+y_female_SGA1 <- data.frame(t(cpmCounts)) %>% 
+  dplyr::filter(., rownames(.) %in% c("VC01_28", "VC01_23", "VC01_73", "VC01_75", "VC01_76", "VC01_77"))
+
+# perform all v all correlations
+cor_x_female_SGA1_y_female_SGA1 <- cor(x_female_SGA1, y_female_SGA1)
+
+# plot female SGA samples only all v all correlations
+pheatmap(t(cor_x_female_SGA1_y_female_SGA1),
+         main = "Protein:Gene correlations (female SGA - all v all Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of ARE full site expression
+y_female_SGA2 <- data.frame(t(cpmCounts_ARE_full)) %>% 
+  dplyr::filter(., rownames(.) %in% c("VC01_28", "VC01_23", "VC01_73", "VC01_75", "VC01_76", "VC01_77"))
+
+# perform female SGA samples only, all protein v positive ARE full correlations
+cor_x_female_SGA1_y_female_SGA2 <- cor(x_female_SGA1, y_female_SGA2)
+# plot all v all correlations
+pheatmap(t(cor_x_female_SGA1_y_female_SGA2),
+         main = "Protein:Gene correlations (female SGA - all protein v ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of positive ARE full site expression
+y_female_SGA3 <- data.frame(t(cpmCounts_positive_ARE_full)) %>% 
+  dplyr::filter(., rownames(.) %in% c("VC01_28", "VC01_23", "VC01_73", "VC01_75", "VC01_76", "VC01_77"))
+
+# perform female SGA samples only all protein v positive ARE full correlations
+cor_x_female_SGA1_y_female_SGA3 <- cor(x_female_SGA1, y_female_SGA3)
+# plot all v all correlations
+pheatmap(t(cor_x_female_SGA1_y_female_SGA3),
+         main = "Protein:Gene correlations (female SGA - all protein v positive ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
+
+# new df of negative ARE full site expression
+y_female_SGA4 <- data.frame(t(cpmCounts_negative_ARE_full)) %>% 
+  dplyr::filter(., rownames(.) %in% c("VC01_28", "VC01_23", "VC01_73", "VC01_75", "VC01_76", "VC01_77"))
+
+# perform female SGA all protein v positive ARE full correlations
+cor_x_female_SGA1_y_female_SGA4 <- cor(x_female_SGA1, y_female_SGA4)
+
+# plot all v negative ARE full correlations
+pheatmap(t(cor_x_female_SGA1_y_female_SGA4),
+         main = "Protein:Gene correlations (female SGA - all protein v negative ARE full Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE)
 
 ```

@@ -34,6 +34,9 @@ library(Glimma)
 # Saving output
 library(xlsx)
 
+## UDFs
+# function to negate magrittr::%in%
+`%notin%` <- Negate(`%in%`)
 
 ## save table function (individual files)
 # topTable : output table from DESeq
@@ -662,7 +665,7 @@ for (i in 1:nsamples){
 
 ```
 
-cit### DESeq2 differential expression
+### DESeq2 differential expression
 
 ```{r DESeq2 differential expression}
 
@@ -964,6 +967,11 @@ ARE_sites <- read.table(file = "~/Bioinformatics/github/postDoc_2022/androgenRec
                         header = TRUE,
                         sep = "\t")
 
+ # [5] "Genes.Positively.regulated.by.ARE.full.sites"                                         
+ # [6] "Genes.Negatively.regulated.by.ARE.full.sites"  
+ # [3] "Genes.Positively.regulated.by.ARE.half.sites"                                         
+ # [4] "Genes.Negatively.regulated.by.ARE.half.sites"                                         
+
 for (i in 1:length(comparisons)){
   
   # set which column are we interested in
@@ -983,7 +991,57 @@ for (i in 1:length(comparisons)){
   # subset the table to only contain genes selected column of ARE_sites
   assign(paste0("comparison_", comparisons[i]),
          dplyr::filter(comparison,
-                       gene %in% ARE_sites$Genes.Positively.regulated.by.ARE.full.sites))
+                       gene %in% ARE_sites$Genes.Negatively.regulated.by.ARE.half.sites))
+  
+  # make the GSEA rank file
+  gsea <- get(print(paste0("comparison_", comparisons[i]), quote = FALSE))
+  # create a new column of GSEA ranking metric
+  gsea["Rank_log"] <- (sign(gsea$log2FoldChange)) * (-log(gsea$padj, 10))
+  gsea <- dplyr::arrange(gsea, desc(Rank_log))
+  gsea_list <- gsea$Rank_log 
+  names(gsea_list) <- gsea$gene
+  
+  write_delim(dplyr::select(gsea, gene, Rank_log),
+              file = paste0(path, outputFilename, "_gseaRank", ".rnk"),
+              delim = "\t")
+  
+}
+
+```
+
+### files for GSEA loop - genes _NOT_ in the ARE list
+
+```{r files for GSEA loop}
+
+# import the list of full/half sites for the androgen receptor
+# this files is from Ash
+# ARE_sites <- read.table(file = "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/AREs.txt",
+#                         header = TRUE,
+#                         sep = "\t")
+
+for (i in 1:length(comparisons)){
+  
+ # [1] "All.genes.containing.ARE.fullsites"                                                   
+ # [2] "All.genes.containing.ARE.halfsites" 
+  
+  # set which column are we interested in
+  sites <- "All.genes.containing.ARE.halfsites"
+  # set path
+  path <- "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/notHalfSites/"
+  # set the output file name for later when we save each table
+  outputFilename <- paste(comparisons[i], sites, sep = "_") 
+  # testing each file name
+  # print(outputFilename)
+  
+  # copy the DE table and drop rows with NAs in the padj
+  # note: DESeq2 will assign NA to the padj column if all samples in the comparison has zero counts for the gene
+  # grab only the comparison we want
+  comparison <- na.omit(list_of_datasets[[i]])
+  
+  # subset the table to only contain genes selected column of ARE_sites
+  assign(paste0("comparison_", comparisons[i]),
+         dplyr::filter(comparison,
+                       gene %notin% ARE_sites$All.genes.containing.ARE.halfsites))
   
   # make the GSEA rank file
   gsea <- get(print(paste0("comparison_", comparisons[i]), quote = FALSE))
