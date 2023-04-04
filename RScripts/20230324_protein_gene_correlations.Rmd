@@ -1,0 +1,362 @@
+---
+title: "Protein_gene_correlations"
+author: "Melanie Smith"
+date: "24/3/2023"
+output: html_document
+---
+
+## Load R Packages
+
+```{r message=FALSE, warning=FALSE, error=FALSE}
+
+# Working with data:
+library(dplyr)
+library(magrittr)
+library(readr)
+library(tibble)
+library(reshape2)
+# Visualisation:
+library(kableExtra)
+library(ggplot2)
+library(ggbiplot)
+library(ggrepel)
+library(grid)
+library(RColorBrewer)
+library(pheatmap)
+# Set ggplot theme
+theme_set(theme_bw())
+# Other packages:
+library(here)
+# Bioconductor packages:
+library(AnnotationHub)
+library(edgeR)
+library(limma)
+library(Glimma)
+# Saving output
+library(xlsx)
+
+## UDFs
+# function to negate magrittr::%in%
+`%notin%` <- Negate(`%in%`)
+
+## save table function (individual files)
+# topTable : output table from DESeq
+# filname : path to output file
+saveTopTable <- function(topTable, filename) {
+  require(xlsx, quietly = TRUE)
+  stopifnot(!missing(topTable))
+  stopifnot(!missing(filename))
+  writexl::write_xlsx(data.frame(topTable) %>%
+  tibble::rownames_to_column("gene") %>%
+  arrange(., padj), 
+  filename)
+}
+
+## save table function (all tables in one file: multiple sheets)
+# file : the path to the output file
+# ... : a list of data to write to the workbook
+xlsx.writeMultipleData <- function (file, ...)
+  {
+    # require(xlsx, quietly = TRUE)
+  stopifnot(!missing(file))
+    objects <- list(...)
+    fargs <- as.list(match.call(expand.dots = TRUE))
+    objectNames <- as.character(fargs)[-c(1, 2)]
+    numberObjects <- length(objects)
+    for (i in 1:numberObjects) {
+        if (i == 1)
+            openxlsx::write.xlsx(objects[[i]], file, sheetName = objectNames[i])
+        else openxlsx::write.xlsx(objects[[i]], file, sheetName = objectNames[i],
+            append = TRUE)
+    }
+}
+
+
+```
+
+## Import Data
+- The first step is to import the gene counts and sample metadata data into R. 
+
+```{r importGeneCounts, message=FALSE, warning=FALSE}
+
+grch38_mRNA_placenta_counts <- readr::read_csv(here("rawData", 
+                               "new_counts_unchanged.csv"), 
+                          col_names = TRUE) %>%
+  as.data.frame %>%
+  tibble::column_to_rownames("...1")
+
+```
+
+### Load Gene Annotation Data from file
+
+```{r load gene annotations}
+# if AnnotationHub objects are pre-downloaded. 
+genes <- readRDS(here("cleanData/genes.rds"))
+```
+
+- The `genes` data.frame is prepared so that the `row.names` (corresponding to Ensembl gene IDs) are in the same order as for the gene count matrix stored in `grch38_mRNA_placenta_counts`. 
+
+```{r message=FALSE, warning=FALSE}
+genes <- data.frame(gene = rownames(grch38_mRNA_placenta_counts)) %>%
+  left_join(genes %>% as.data.frame, 
+            by = c("gene"="gene_name")) %>%
+  dplyr::distinct(gene, .keep_all=TRUE) 
+
+rownames(genes) <- genes$gene
+```
+
+## Import metadata
+
+```{r import metadata}
+
+# Import metadata
+samples <- readr::read_csv(file = here(
+  "cleanData/originalDemographicsStillbirthCRE.csv"),
+  col_names = TRUE
+ )
+
+# Tidy up the hyphen in outcome
+samples$outcome <- gsub("-", "_", samples$outcome)
+
+# drop metadata for samples not in counts
+samples <- dplyr::filter(samples, 
+                         AGRF_ID %in% colnames(grch38_mRNA_placenta_counts))
+
+# add a sex_pathology column to the metadata
+samples <- mutate(samples, sex_pathology = paste(
+  infantSex, outcome, sep = "_")
+  )
+
+# set the new factor levels
+samples$sex_pathology <- factor(
+  samples$sex_pathology, c(
+    "Female_AGA",
+    "Male_AGA",
+    "Female_SGA",
+    "Male_SGA",
+    "Female_10_30th",
+    "Male_10_30th"
+    )
+  )
+
+
+samples$Study <- factor(
+  samples$Study, c(
+    "Martha",
+    "Sharon",
+    "Stacey",
+    "Olivia",
+    "Vicki"
+    )
+  )
+
+```
+
+## Create DGEList object
+
+```{r createDGEList}
+
+# ensure counts are in the same order as the metadata samplenames
+grch38_mRNA_placenta_counts <- grch38_mRNA_placenta_counts[,samples$AGRF_ID]
+
+dge <- DGEList(counts = grch38_mRNA_placenta_counts, 
+               genes = genes,
+               samples = samples,
+               remove.zeros = TRUE) %>%  
+  calcNormFactors("TMM")
+
+# Preview the DGEList object
+dge
+
+```
+
+### Drop low expressed genes
+
+```{r drop low expression genes}
+
+# drop genes that don't have an official gene symbol
+dge_dropped <- dge[!is.na(dge$genes$gene_id), ]
+
+# calculate the cpm value of a read count of 10 given the mean library size
+# (to be used in the keep.genes)
+cpm(10, mean(dge_dropped$samples$lib.size))
+
+# filter threshold (log2 CPM expression)
+filterCPM <- cpm(10, mean(dge_dropped$samples$lib.size))
+# filter threshold (smallest group)
+numSamples <- dim(dplyr::filter(
+  dge_dropped$samples,
+  outcome == "AGA" &
+    infantSex == "Male")
+  )[1]
+numSamples
+
+# new df of unfiltered cpm for the reduced DGEList
+rawCpm_mRNA <- cpm(dge_dropped)
+# new df of unfiltered log 2 cpm for the reduced DGEList
+rawlcpm_mRNA <- cpm(dge_dropped, log = TRUE, prior.count = 3)
+
+# remove low expressed genes (filterCPM in numSamples PE)
+keep.exprs <- rowSums(rawCpm_mRNA > filterCPM[[1]]) >= numSamples
+
+# Perform the filtering step and recalculate the TMM normalisation factors for each library.
+dge_dropped <- dge_dropped[keep.exprs,,keep.lib.sizes = FALSE]
+
+dim(dge_dropped)
+
+## The density of log-CPM values for pre-filtered data
+# (A) and post-filtered data
+# (B) are shown for each sample.
+## Dotted vertical lines mark the log-CPM of 1 threshold
+# (equivalent to a CPM value of 2) used in the filtering step.
+nsamples <- ncol(dge_dropped)
+col_mRNA <- colorRampPalette(RColorBrewer::brewer.pal(11,"Spectral"))(ncol(dge_dropped))
+par(mfrow=c(1,2))
+plot(
+  density(
+    rawlcpm_mRNA[,1]
+  ),
+  col = col_mRNA[1],
+  lwd = 2,
+  ylim = c(0, 0.20),
+  las = 2,
+  main = "",
+  xlab = "")
+title(main = "A. dge_dropped Unfiltered data", xlab = "Log-cpm")
+abline(v = 1, lty = 3)
+for (i in 1:nsamples){
+  den <- density(rawlcpm_mRNA[,i])
+  lines(den$x, den$y, col = col_mRNA[i], lwd = 2)
+}
+#legend("topright", legend = samples$samplename, text.col = col, bty = "n")
+#dev.off()
+lcpm <- cpm(dge_dropped, log=TRUE)
+plot(density(lcpm[,1]), col = col_mRNA[1], lwd = 2, ylim = c(0, 0.20), las = 2,
+     main = "", xlab = "")
+title(main = "B. dge_dropped Filtered data", xlab = "Log-cpm")
+abline(v = 1, lty = 3)
+for (i in 1:nsamples){
+  den <- density(lcpm[,i])
+  lines(den$x, den$y, col = col_mRNA[i], lwd = 2)
+}
+
+```
+
+### import the normalised protein data
+
+```{r import ARE genes}
+
+# this files is from Ash
+proteinCounts <- readxl::read_excel(path = "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/23march03_AR_isoforms.xlsx") %>% 
+  dplyr::select(., rowname = ...1, everything()) %>% 
+  tibble::column_to_rownames("rowname")
+
+# quick visualisation of the protein data
+melt(t(proteinCounts)) %>%
+  dplyr::select(., samplename = Var1, protein = Var2, count = value) %>%
+  dplyr::left_join(., dge$samples, by = c("samplename" = "AGRF_ID")) %>% 
+  ggplot(., aes(x = protein,
+                y = count,
+                colour = sex_pathology)) +
+  geom_point()
+
+```
+
+### subset dgelist to contain only samples with protein data
+
+```{r subset dge}
+
+# subset the dge list to only include samples with protein counts
+subset_dge <- dge_dropped[, colnames(proteinCounts)]
+
+```
+
+### import the list of full/half sites for the androgen receptor
+
+```{r import ARE genes}
+
+# this files is from Ash
+ARE_sites <- read.table(file = "~/Bioinformatics/github/postDoc_2022/androgenReceptor_placenta/cleanData/AREs.txt",
+                        header = TRUE,
+                        sep = "\t")
+# not all of the genes with an ARE full site are in our RNA-seq data - remove gene names not in our counts table
+ARE_full <- data.frame(geneName = unique(ARE_sites$All.genes.containing.ARE.fullsites)) %>% 
+  dplyr::filter(., geneName %in% rownames(dge_dropped))
+
+positive_ARE_full <- data.frame(geneName = unique(ARE_sites$Genes.Positively.regulated.by.ARE.full.sites)) %>% 
+  dplyr::filter(., geneName %in% rownames(dge_dropped))
+  
+# create a df of log2 gene counts ARE full
+cpmCounts_ARE_full <- edgeR::cpm(subset_dge[ARE_full$geneName, ], log = TRUE)
+
+# create a df of log2 gene counts positive ARE full
+cpmCounts_positive_ARE_full <- edgeR::cpm(subset_dge[positive_ARE_full$geneName, ], log = TRUE)
+
+# create a column annotation df
+annotation <- subset_dge$samples %>%
+  tibble::rownames_to_column("samplename") %>%
+  dplyr::select(., samplename, sex_pathology)
+row.names(annotation) <- annotation$samplename
+
+# quick heatmap of log2 gene counts (ARE_full subset)
+pheatmap(cpmCounts_ARE_full,
+         annotation_col = dplyr::select(annotation, -samplename),
+         main = "Gene Expresson ARE Full Site (log2 CPM)",
+         cluster_rows = TRUE,
+         cluster_cols = TRUE,
+         show_rownames = FALSE)
+
+pheatmap(cpmCounts_ARE_full,
+         annotation_col = dplyr::select(annotation, -samplename),
+         main = "Gene Expresson ARE Full Site (row scaled)",
+         cluster_rows = TRUE,
+         cluster_cols = TRUE,
+         scale = "row",
+         show_rownames = FALSE)
+
+# quick heatmap of log2 gene counts (positive ARE full subset)
+pheatmap(cpmCounts_positive_ARE_full,
+         annotation_col = dplyr::select(annotation, -samplename),
+         main = "Gene Expresson positive ARE Full Site (log2 CPM)",
+         cluster_rows = TRUE,
+         cluster_cols = TRUE,
+         show_rownames = FALSE)
+
+pheatmap(cpmCounts_positive_ARE_full,
+         annotation_col = dplyr::select(annotation, -samplename),
+         main = "Gene Expresson positive ARE Full Site (row scaled)",
+         cluster_rows = TRUE,
+         cluster_cols = TRUE,
+         scale = "row",
+         show_rownames = FALSE)
+
+# quick heatmap of protein counts
+pheatmap(proteinCounts,
+         main = "Protein Abundance",
+         annotation_col = dplyr::select(annotation, -samplename),
+         cluster_rows = FALSE,
+         cluster_cols = TRUE,
+         scale = "row",
+         show_rownames = TRUE)
+
+```
+
+## Correlations (Pearson's)
+
+```{r correlation}
+
+# convert counts/abunance to df
+x2 <- data.frame(t(proteinCounts))
+y2 <- data.frame(t(cpmCounts))
+# perform all v all correlations
+cor_x2y2 <- cor(x2, y2)
+# plot all v all correlations
+pheatmap(t(cor_x2y2),
+         main = "Protein:Gene correlations (all v all Pearson's)",
+         show_rownames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE,
+         scale = "row")
+
+
+```
